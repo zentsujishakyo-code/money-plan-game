@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>マネープランゲーム</title>
+<style>
+  :root{
+    --green:#2e8b57; --green-d:#1f6b41;
+    --red:#d64545; --blue:#3a6ea5; --yellow:#f4b400;
+    --ink:#2b2b2b; --muted:#6b6b6b; --line:#e3e0d8;
+    --bg:#faf8f3; --card:#ffffff;
+    --info-bg:#e8f1fb; --info-tx:#1f5aa5;
+    --ok-bg:#e7f5ec; --ok-tx:#1f7a44;
+    --warn-bg:#fdecec; --warn-tx:#b23030;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; }
+  body{
+    font-family:"Hiragino Maru Gothic ProN","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",sans-serif;
+    background:var(--bg); color:var(--ink);
+    line-height:1.6; -webkit-text-size-adjust:100%;
+  }
+  ruby rt{ font-size:0.5em; font-weight:400; color:inherit; }
+  #app{ max-width:520px; margin:0 auto; padding:16px 14px 40px; min-height:100vh; }
+
+  .screen{ display:none; }
+  .screen.active{ display:block; animation:fade .25s ease; }
+  @keyframes fade{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
+
+  h1{ font-size:26px; font-weight:700; text-align:center; margin:8px 0 4px; }
+  .lead{ text-align:center; color:var(--muted); font-size:16px; margin:0 0 20px; }
+
+  .btn{
+    display:block; width:100%; border:none; border-radius:14px;
+    padding:16px; font-size:18px; font-weight:700; cursor:pointer;
+    font-family:inherit; transition:transform .08s, box-shadow .15s;
+  }
+  .btn:active{ transform:scale(0.98); }
+  .btn-primary{ background:var(--green); color:#fff; box-shadow:0 3px 0 var(--green-d); }
+  .btn-primary:active{ box-shadow:0 1px 0 var(--green-d); }
+  .btn-sub{ background:#fff; color:var(--ink); border:2px solid var(--line); box-shadow:none; }
+  .btn-row{ display:flex; flex-direction:column; gap:12px; margin-top:18px; }
+
+  .panel{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px; }
+
+  /* 残高バー */
+  .hud{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:12px 16px; margin-bottom:14px; position:sticky; top:8px; z-index:5;
+  }
+  .hud .lbl{ font-size:12px; color:var(--muted); }
+  .hud .bal{ font-size:24px; font-weight:700; }
+  .hud .rem{ font-size:16px; font-weight:700; text-align:right; }
+  .neg{ color:var(--red) !important; }
+
+  /* プラン選択 */
+  .exp{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:12px; }
+  .exp h3{ margin:0 0 12px; font-size:19px; font-weight:700; }
+  .opts{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .opt{
+    border:2px solid var(--line); background:#fff; border-radius:12px;
+    padding:12px 6px; cursor:pointer; text-align:center;
+    display:flex; flex-direction:column; gap:4px; min-height:92px;
+    justify-content:center; font-family:inherit; transition:all .12s;
+  }
+  .opt .tag{ font-size:13px; font-weight:700; color:var(--muted); }
+  .opt .nm{ font-size:14px; line-height:1.25; color:var(--ink); }
+  .opt .pr{ font-size:14px; font-weight:700; color:var(--muted); }
+  .opt.sel{ border-color:var(--green); background:var(--ok-bg); }
+  .opt.sel .tag, .opt.sel .pr{ color:var(--green-d); }
+
+  .summary{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-top:6px; }
+  .srow{ display:flex; justify-content:space-between; align-items:center; padding:5px 0; font-size:16px; }
+  .srow .v{ font-weight:700; }
+  .sdiv{ border-bottom:1px solid var(--line); margin:6px 0; }
+  .free{ font-size:18px; font-weight:700; }
+  .free .v{ font-size:26px; }
+  .hint{ text-align:center; font-size:14px; color:var(--muted); margin:10px 0 0; }
+
+  /* カード */
+  .cardback{
+    width:180px; height:250px; margin:10px auto; border-radius:18px;
+    background:repeating-linear-gradient(45deg,#2e8b57,#2e8b57 12px,#27794b 12px,#27794b 24px);
+    border:4px solid #fff; box-shadow:0 6px 16px rgba(0,0,0,.15);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    color:#fff; font-size:18px; font-weight:700; transition:transform .1s;
+  }
+  .cardback:active{ transform:scale(0.97); }
+  .cardback .qm{ font-size:64px; }
+
+  .gamecard{ border-radius:18px; overflow:hidden; border:1px solid var(--line); }
+  .gc-head{ padding:16px 18px 14px; color:#fff; text-align:center; }
+  .gc-head .ic{ font-size:34px; line-height:1; }
+  .gc-head h2{ margin:6px 0 2px; font-size:24px; font-weight:700; }
+  .gc-head .sub{ font-size:14px; opacity:.95; font-weight:400; }
+  .gc-green{ background:var(--green); }
+  .gc-yellow{ background:var(--yellow); color:#5a4500; }
+  .gc-yellow .sub{ color:#5a4500; }
+  .gc-red{ background:var(--red); }
+  .gc-body{ background:#fff; padding:16px; }
+
+  .choice{
+    width:100%; border:2px solid var(--line); background:#fff; border-radius:12px;
+    padding:14px; margin-bottom:10px; cursor:pointer; font-family:inherit;
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
+    font-size:16px; text-align:left; transition:all .12s;
+  }
+  .choice .ci{ display:flex; align-items:center; gap:10px; }
+  .choice .badge{ width:26px; height:26px; border-radius:50%; color:#fff; font-weight:700; font-size:14px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+  .choice .amt{ font-weight:700; white-space:nowrap; }
+  .choice.A .badge{ background:var(--red); }
+  .choice.B .badge{ background:var(--green); }
+  .choice.C .badge{ background:var(--blue); }
+  .choice:active{ transform:scale(0.99); }
+  .choice.picked{ border-color:var(--green); background:var(--ok-bg); }
+  .choice:disabled{ opacity:.5; cursor:default; }
+
+  .bigbox{ border-radius:12px; padding:18px; text-align:center; margin-bottom:4px; }
+  .bigbox .k{ font-size:14px; margin-bottom:6px; }
+  .bigbox .v{ font-size:26px; font-weight:700; }
+  .box-info{ background:var(--info-bg); } .box-info .k,.box-info .v{ color:var(--info-tx); }
+  .box-ok{ background:var(--ok-bg); } .box-ok .k,.box-ok .v{ color:var(--ok-tx); }
+  .box-warn{ background:var(--warn-bg); } .box-warn .k,.box-warn .v{ color:var(--warn-tx); }
+
+  .resultmsg{ margin-top:14px; padding:14px; border-radius:12px; text-align:center; font-size:16px; }
+
+  /* 結論 */
+  .ending{ text-align:center; padding-top:10px; }
+  .ending .big{ font-size:30px; font-weight:700; }
+  .ending .big.plus{ color:var(--green); }
+  .ending .big.minus{ color:var(--blue); }
+  .endhead{ font-size:22px; font-weight:700; margin:18px 0 10px; }
+  .endbody{ font-size:16px; text-align:left; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
+  .endcommon{ font-size:18px; font-weight:700; margin:18px 0; color:var(--green-d); }
+
+  .progress{ text-align:center; font-size:13px; color:var(--muted); margin:14px 0 4px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- メニュー -->
+  <section class="screen active" id="s-menu">
+    <h1>マネープランゲーム</h1>
+    <p class="lead">お金の つかいかたを かんがえよう</p>
+    <div class="panel">
+      <p style="text-align:center; margin:0 0 4px; font-size:16px;">どこから はじめる？</p>
+      <div class="btn-row">
+        <button class="btn btn-sub" onclick="GAME.start('intro')">100まんえんの はなしから</button>
+        <button class="btn btn-primary" onclick="GAME.start('plan')">ゲームから はじめる</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 100万円アイスブレイク -->
+  <section class="screen" id="s-intro">
+    <h1>もしも 100まんえん</h1>
+    <p class="lead">あったら なにが ほしい？したい？</p>
+    <div class="panel">
+      <textarea id="introText" rows="5" placeholder="ここに かいてみよう（かかなくても OK）"
+        style="width:100%; border:2px solid var(--line); border-radius:12px; padding:12px; font-size:16px; font-family:inherit; resize:vertical;"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="GAME.goPlan()">つぎへ すすむ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- プラン選択 -->
+  <section class="screen" id="s-plan">
+    <h1>どんな くらしを する？</h1>
+    <p class="lead">5つの こうもくを 1つずつ えらんでね</p>
+    <div id="expList"></div>
+    <div class="summary">
+      <div class="srow"><span>お<ruby>給料<rt>きゅうりょう</rt></ruby></span><span class="v" id="sumSalary">150,000えん</span></div>
+      <div class="srow"><span>1か<ruby>月<rt>げつ</rt></ruby>の <ruby>合計<rt>ごうけい</rt></ruby></span><span class="v" id="sumTotal">—</span></div>
+      <div class="sdiv"></div>
+      <div class="srow free"><span><ruby>自由<rt>じゆう</rt></ruby>に つかえる お<ruby>金<rt>かね</rt></ruby></span><span class="v" id="sumFree">—</span></div>
+      <p class="hint" id="planHint">ぜんぶ えらぶと けいさんされるよ</p>
+      <div class="btn-row" id="planNext" style="display:none;">
+        <button class="btn btn-primary" onclick="GAME.startGame()">この くらしで ゲームへ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- カードゲーム -->
+  <section class="screen" id="s-game">
+    <div class="hud">
+      <div><div class="lbl">いまの ざんだか</div><div class="bal" id="gBal">0えん</div></div>
+      <div><div class="lbl">のこりカード</div><div class="rem" id="gRem">0まい</div></div>
+    </div>
+    <div id="gStage"></div>
+  </section>
+
+  <!-- 結論 -->
+  <section class="screen" id="s-end">
+    <div class="ending">
+      <div class="bigbox box-ok" style="margin-bottom:14px;">
+        <div class="k">1かげつ つかった けっか</div>
+        <div class="v" id="endBal">0えん</div>
+      </div>
+      <div class="big" id="endBig">—</div>
+      <div class="endhead" id="endHead"></div>
+      <div class="endbody" id="endBody"></div>
+      <div class="endcommon" id="endCommon"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="GAME.restart()">もう いちど あそぶ</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="config.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
