@@ -237,7 +237,10 @@ const GAME = {
         if(o.setsFlag){ this.flags[o.setsFlag] = true; }
         if(o.note){ extraMsg = (extraMsg?extraMsg+' ':'') + o.note; }
         const base = o.cost>0 ? (o.text+'を えらんで '+o.cost.toLocaleString('ja-JP')+'えん 払ったよ') : (o.text+'を えらんだよ（0えん）');
-        this.afterAction(body, extraMsg ? base+'／'+extraMsg : base, this.fxForPay(o.cost));
+        // 緑カードは「自分で選ぶ買い物」なので、泣き顔ではなく普通の顔。
+        // ただし宝くじに当たってお金が増えたときだけ、うれしい顔。
+        const fx = (o.lottery && extraMsg.indexOf('もらえた')>=0) ? 'plus' : 'calm';
+        this.afterAction(body, extraMsg ? base+'／'+extraMsg : base, fx);
       };
       body.appendChild(b);
     });
@@ -255,7 +258,7 @@ const GAME = {
     const b = document.createElement('button');
     b.className='btn btn-primary'; b.style.marginTop='12px';
     b.textContent = opt.cost.toLocaleString('ja-JP')+'えん 払う';
-    b.onclick = () => { b.disabled=true; this.pay(opt.cost); this.afterAction(body, '毎月の 固定費を 払ったよ', this.fxForPay(opt.cost)); };
+    b.onclick = () => { b.disabled=true; this.pay(opt.cost); this.afterAction(body, '毎月の 固定費を 払ったよ', 'calm'); };
     body.appendChild(b);
   },
 
@@ -321,7 +324,7 @@ const GAME = {
         box.className='bigbox box-ok';
         box.innerHTML = '<div class="k">セーフ！</div><div class="v" style="font-size:16px;">'+card.requireExpense.reason+'<br>あなたは 払わなくて OK</div>';
         body.appendChild(box);
-        this.afterAction(body, '', 'flat'); return;
+        this.afterAction(body, '', 'calm'); return;
       }
     }
     const box = document.createElement('div');
@@ -369,9 +372,10 @@ const GAME = {
   /* どの演出で どのキャラを 出すか */
   CHAR_FOR: {
     plus:     'char-happy.png',     // お金が増えた
-    minus:    'char-sad.png',       // 出費
+    minus:    'char-sad.png',       // 出費（赤カードなど 突然の出費）
     bigminus: 'char-sad.png',       // 大きな出費
     excited:  'char-excited.png',   // 福引き・くじの当たり
+    calm:     'char-normal.png',    // 自分で選ぶ買い物・支払い・セーフ
     flat:     'char-normal.png'     // 増減なし
   },
 
@@ -390,9 +394,9 @@ const GAME = {
     img.alt = '';
     pop.appendChild(img);
     document.body.appendChild(pop);
-    // アニメ終了後に消す（flatは短め）
-    const life = (kind==='flat') ? 900 : 1300;
-    setTimeout(()=>{ pop.classList.add('out'); }, life - 250);
+    // 表示時間（少し長めに）
+    const life = 2200;
+    setTimeout(()=>{ pop.classList.add('out'); }, life - 350);
     setTimeout(()=>{ if(pop.parentNode) pop.remove(); }, life);
   },
 
