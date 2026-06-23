@@ -148,6 +148,52 @@
     .fx-plus,.fx-minus,.fx-bigminus{ animation:none; }
   }
 
+  /* キャラのポップアップ（画面中央にふわっと出る） */
+  .charpop{
+    position:fixed; left:50%; top:42%;
+    transform:translate(-50%,-50%);
+    z-index:50; pointer-events:none;
+    opacity:0;
+  }
+  .charpop img{
+    width:200px; max-width:60vw; height:auto;
+    display:block;
+    filter:drop-shadow(0 6px 12px rgba(0,0,0,.18));
+  }
+  .charpop.is-up{   animation:popUp .5s cubic-bezier(.2,1.4,.5,1) forwards; }
+  .charpop.is-down{ animation:popDown .5s ease forwards; }
+  .charpop.is-flat{ animation:popFlat .5s ease forwards; }
+  .charpop.out{ animation:popOut .25s ease forwards; }
+  @keyframes popUp{
+    0%{ opacity:0; transform:translate(-50%,-50%) scale(.5) translateY(20px); }
+    60%{ opacity:1; transform:translate(-50%,-50%) scale(1.08) translateY(-6px); }
+    100%{ opacity:1; transform:translate(-50%,-50%) scale(1) translateY(0); }
+  }
+  @keyframes popDown{
+    0%{ opacity:0; transform:translate(-50%,-50%) scale(.8); }
+    100%{ opacity:1; transform:translate(-50%,-50%) scale(1) translateY(6px); }
+  }
+  @keyframes popFlat{
+    0%{ opacity:0; transform:translate(-50%,-50%) scale(.85); }
+    100%{ opacity:.95; transform:translate(-50%,-50%) scale(1); }
+  }
+  @keyframes popOut{
+    0%{ opacity:1; }
+    100%{ opacity:0; transform:translate(-50%,-50%) scale(.9); }
+  }
+
+  /* 結果画面の キャラ */
+  .endchar{
+    display:block; margin:0 auto 6px;
+    width:180px; max-width:55vw; height:auto;
+    animation:fade .6s ease both;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .charpop,.charpop.is-up,.charpop.is-down,.charpop.is-flat{ animation:none; opacity:1; }
+    .endchar{ animation:none; }
+  }
+
   /* 難易度選択 */
   .diffrow{ display:flex; gap:8px; margin-top:14px; }
   .diffbtn{ flex:1; border:2px solid var(--line); background:#fff; border-radius:12px; padding:12px 6px; font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; color:var(--muted); }
@@ -223,6 +269,7 @@
         <div class="k">1かげつ つかった けっか</div>
         <div class="v" id="endBal">0えん</div>
       </div>
+      <img id="endChar" class="endchar" src="" alt="">
       <div class="big" id="endBig">—</div>
       <div class="endhead" id="endHead"></div>
       <div class="endbody" id="endBody"></div>
