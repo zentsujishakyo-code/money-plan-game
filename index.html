@@ -1,176 +1,241 @@
-/* ============================================================
-   マネープランゲーム  設定ファイル（config.js）  v2
-   ------------------------------------------------------------
-   このファイルの数字や文章を書きかえると、
-   ゲームのバランスや内容を調整できます。
-   プログラム（game.js）はさわらなくて大丈夫です。
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>マネープランゲーム</title>
+<style>
+  :root{
+    --green:#2e8b57; --green-d:#1f6b41;
+    --red:#d64545; --blue:#3a6ea5; --yellow:#f4b400;
+    --ink:#2b2b2b; --muted:#6b6b6b; --line:#e3e0d8;
+    --bg:#faf8f3; --card:#ffffff;
+    --info-bg:#e8f1fb; --info-tx:#1f5aa5;
+    --ok-bg:#e7f5ec; --ok-tx:#1f7a44;
+    --warn-bg:#fdecec; --warn-tx:#b23030;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; }
+  body{
+    font-family:"Hiragino Maru Gothic ProN","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",sans-serif;
+    background:var(--bg); color:var(--ink);
+    line-height:1.6; -webkit-text-size-adjust:100%;
+  }
+  ruby rt{ font-size:0.5em; font-weight:400; color:inherit; }
+  #app{ max-width:520px; margin:0 auto; padding:16px 14px 40px; min-height:100vh; }
 
-   ★よくある調整★
-   - お給料          … SALARY
-   - 1回で使う枚数   … DRAW_COUNT（支払日カードはこれとは別に必ず入る）
-   - 福引きの当たり率 … FUKUBIKI_WIN_RATE（0〜1）
-   - 金額をかえる     … 各カードの cost / gain / win
-   - 文章をかえる     … title / subtitle / text
-   - むずかしさ       … DIFFICULTY と DIFFICULTY_SETS
+  .screen{ display:none; }
+  .screen.active{ display:block; animation:fade .25s ease; }
+  @keyframes fade{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
 
-   ★カードの連動★
-   - requireFlag:"shikaku"      … 資格を持っている人だけ有効
-   - requireExpense:{key,label} … ワークシート1で特定プランを選んだ人だけ
-   - setsFlag:"shikaku"/"hoken" … このカードで資格・保険を得る
-   - onlyIfFlag:"hoken"         … その選択肢は条件を満たす人だけ
-   ============================================================ */
+  h1{ font-size:26px; font-weight:700; text-align:center; margin:8px 0 4px; }
+  .lead{ text-align:center; color:var(--muted); font-size:16px; margin:0 0 20px; }
 
-const CONFIG = {
+  .btn{
+    display:block; width:100%; border:none; border-radius:14px;
+    padding:16px; font-size:18px; font-weight:700; cursor:pointer;
+    font-family:inherit; transition:transform .08s, box-shadow .15s;
+  }
+  .btn:active{ transform:scale(0.98); }
+  .btn-primary{ background:var(--green); color:#fff; box-shadow:0 3px 0 var(--green-d); }
+  .btn-primary:active{ box-shadow:0 1px 0 var(--green-d); }
+  .btn-sub{ background:#fff; color:var(--ink); border:2px solid var(--line); box-shadow:none; }
+  .btn-row{ display:flex; flex-direction:column; gap:12px; margin-top:18px; }
 
-  SALARY: 230000,
-  DRAW_COUNT: 15,
-  FUKUBIKI_WIN_RATE: 0.45,
-  SPREAD_PAYDAY: true,
-  DIFFICULTY: "normal",
+  .panel{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px; }
 
-  DIFFICULTY_SETS: {
-    easy:   { drawCount: 12, luckyBoost: 2,  fukubikiWin: 0.6,  hiCap: 1 },
-    normal: { drawCount: 15, luckyBoost: 1,  fukubikiWin: 0.45, hiCap: 2 },
-    hard:   { drawCount: 18, luckyBoost: -1, fukubikiWin: 0.3,  hiCap: 3 }
-  },
+  /* 残高バー */
+  .hud{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:12px 16px; margin-bottom:14px; position:sticky; top:8px; z-index:5;
+  }
+  .hud .lbl{ font-size:12px; color:var(--muted); }
+  .hud .bal{ font-size:24px; font-weight:700; }
+  .hud .rem{ font-size:16px; font-weight:700; text-align:right; }
+  .neg{ color:var(--red) !important; }
 
-  EXPENSES: [
-    { key:"food", name:"食事", ruby:"しょくじ",
-      options:[
-        { label:"A", text:"すべて外食", textRuby:"すべて<ruby>外食<rt>がいしょく</rt></ruby>", cost:50000 },
-        { label:"B", text:"たまに外食", textRuby:"たまに<ruby>外食<rt>がいしょく</rt></ruby>", cost:30000 },
-        { label:"C", text:"すべて自炊", textRuby:"すべて<ruby>自炊<rt>じすい</rt></ruby>", cost:20000 }
-      ] },
-    { key:"home", name:"家", ruby:"いえ",
-      options:[
-        { label:"A", text:"新築・便利", textRuby:"<ruby>新築<rt>しんちく</rt></ruby>・<ruby>便利<rt>べんり</rt></ruby>", cost:60000 },
-        { label:"B", text:"築10年・自転車", textRuby:"<ruby>築<rt>ちく</rt></ruby>10<ruby>年<rt>ねん</rt></ruby>・<ruby>自転車<rt>じてんしゃ</rt></ruby>", cost:40000 },
-        { label:"C", text:"古い・店が遠い", textRuby:"<ruby>古<rt>ふる</rt></ruby>い・<ruby>店<rt>みせ</rt></ruby>が<ruby>遠<rt>とお</rt></ruby>い", cost:30000 }
-      ] },
-    { key:"util", name:"電気ガス水道", ruby:"でんき・ガス・すいどう",
-      options:[
-        { label:"A", text:"気にせず使う", textRuby:"<ruby>気<rt>き</rt></ruby>にせず<ruby>使<rt>つか</rt></ruby>う", cost:15000 },
-        { label:"B", text:"ふつうに使う", textRuby:"ふつうに<ruby>使<rt>つか</rt></ruby>う", cost:11000 },
-        { label:"C", text:"節約する", textRuby:"<ruby>節約<rt>せつやく</rt></ruby>する", cost:7000 }
-      ] },
-    { key:"phone", name:"スマホ", ruby:"",
-      options:[
-        { label:"A", text:"無制限", textRuby:"<ruby>無制限<rt>むせいげん</rt></ruby>", cost:10000 },
-        { label:"B", text:"20ギガ", textRuby:"20ギガ", cost:3000 },
-        { label:"C", text:"格安3ギガ", textRuby:"<ruby>格安<rt>かくやす</rt></ruby>3ギガ", cost:1000 }
-      ] },
-    { key:"move", name:"移動", ruby:"いどう",
-      options:[
-        { label:"A", text:"自分の車", textRuby:"<ruby>自分<rt>じぶん</rt></ruby>の<ruby>車<rt>くるま</rt></ruby>", cost:10000 },
-        { label:"B", text:"公共交通", textRuby:"<ruby>公共<rt>こうきょう</rt></ruby><ruby>交通<rt>こうつう</rt></ruby>", cost:5000 },
-        { label:"C", text:"徒歩・自転車", textRuby:"<ruby>徒歩<rt>とほ</rt></ruby>・<ruby>自転車<rt>じてんしゃ</rt></ruby>", cost:1000 }
-      ] }
-  ],
+  /* プラン選択 */
+  .exp{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:12px; }
+  .exp h3{ margin:0 0 12px; font-size:19px; font-weight:700; }
+  .opts{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .opt{
+    border:2px solid var(--line); background:#fff; border-radius:12px;
+    padding:12px 6px; cursor:pointer; text-align:center;
+    display:flex; flex-direction:column; gap:4px; min-height:92px;
+    justify-content:center; font-family:inherit; transition:all .12s;
+  }
+  .opt .tag{ font-size:13px; font-weight:700; color:var(--muted); }
+  .opt .nm{ font-size:14px; line-height:1.25; color:var(--ink); }
+  .opt .pr{ font-size:14px; font-weight:700; color:var(--muted); }
+  .opt.sel{ border-color:var(--green); background:var(--ok-bg); }
+  .opt.sel .tag, .opt.sel .pr{ color:var(--green-d); }
 
-  PAYDAY_CARDS: [
-    { type:"pay", title:"食費の支払日",     expenseKey:"food",  icon:"food" },
-    { type:"pay", title:"家賃の支払日",     expenseKey:"home",  icon:"home" },
-    { type:"pay", title:"水道光熱費の支払日", expenseKey:"util",  icon:"bulb" },
-    { type:"pay", title:"通信費の支払日",   expenseKey:"phone", icon:"phone" },
-    { type:"pay", title:"交通費の支払日",   expenseKey:"move",  icon:"bus" }
-  ],
+  .summary{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-top:6px; }
+  .srow{ display:flex; justify-content:space-between; align-items:center; padding:5px 0; font-size:16px; }
+  .srow .v{ font-weight:700; }
+  .sdiv{ border-bottom:1px solid var(--line); margin:6px 0; }
+  .free{ font-size:18px; font-weight:700; }
+  .free .v{ font-size:26px; }
+  .hint{ text-align:center; font-size:14px; color:var(--muted); margin:10px 0 0; }
 
-  CARDS: [
-    { type:"green", title:"靴", subtitle:"仕事用に靴を買おう！", icon:"shoe",
-      options:[ {label:"A",text:"好きなブランドの靴",cost:6000},{label:"B",text:"手頃な値段の靴",cost:3000},{label:"C",text:"とにかく安い靴",cost:1000} ] },
-    { type:"green", title:"ランチ", subtitle:"高級ホテルのランチに誘われた", icon:"food",
-      options:[ {label:"A",text:"行く！",cost:3000},{label:"B",text:"近くのカフェでランチ",cost:1000},{label:"C",text:"行かない",cost:0} ] },
-    { type:"green", title:"お祭り", subtitle:"友達とお祭りにきました", icon:"festival",
-      options:[ {label:"A",text:"好きなだけ買い物",cost:3000},{label:"B",text:"時々ガマンする",cost:1000},{label:"C",text:"花火だけ楽しむ",cost:0} ] },
-    { type:"green", title:"プレゼント", subtitle:"お世話になった方へ…", icon:"gift",
-      options:[ {label:"A",text:"プレゼントを贈る（高い）",cost:10000},{label:"B",text:"プレゼントを贈る（安い）",cost:5000},{label:"C",text:"SNSでメッセージ",cost:0} ] },
-    { type:"green", title:"電球", subtitle:"お風呂場の電球がきれた", icon:"bulb",
-      options:[ {label:"A",text:"業者にお願いする",cost:4000},{label:"B",text:"自分で交換する",cost:1000},{label:"C",text:"そのままにする",cost:0} ] },
-    { type:"green", title:"東京○○ランド", subtitle:"旅行に誘われた♪", icon:"park",
-      options:[ {label:"A",text:"行く！",cost:30000},{label:"B",text:"香川県内の遊園地を提案",cost:5000},{label:"C",text:"行かない",cost:0} ] },
-    { type:"green", title:"誕生日", subtitle:"家族のおたん生日です！", icon:"cake",
-      options:[ {label:"A",text:"お店のケーキを贈る",cost:5000},{label:"B",text:"手作りのケーキを贈る",cost:2000},{label:"C",text:"SNSで伝える",cost:0} ] },
-    { type:"green", title:"マンガ", subtitle:"話題のマンガの新刊が発売！", icon:"book",
-      options:[ {label:"A",text:"新刊を買う",cost:2000},{label:"B",text:"レンタルで読む",cost:1000},{label:"C",text:"友達に借りて読む",cost:0} ] },
-    { type:"green", title:"募金", subtitle:"大きな災害が発生！募金活動中", icon:"heart",
-      options:[ {label:"A",text:"募金する",cost:5000},{label:"B",text:"ボランティアに行く（交通費）",cost:3000},{label:"C",text:"何もしない",cost:0} ] },
-    { type:"green", title:"スマホ", subtitle:"スマホの新機種が発売！", icon:"phone",
-      options:[ {label:"A",text:"新機種を買う",cost:50000},{label:"B",text:"一つ前の機種を買う",cost:30000},{label:"C",text:"買わない",cost:0} ] },
-    { type:"green", title:"お花見", subtitle:"会社の人にお花見に誘われた♪", icon:"festival",
-      options:[ {label:"A",text:"みんなでご飯を食べる",cost:5000},{label:"B",text:"お花を見るだけ（交通費）",cost:1000},{label:"C",text:"参加しない",cost:0} ] },
-    { type:"green", title:"ピザ", subtitle:"季節限定のピザが発売された", icon:"food",
-      options:[ {label:"A",text:"宅配してもらう",cost:3000},{label:"B",text:"お店へ取りにいく",cost:2000},{label:"C",text:"自分で作る",cost:1000} ] },
-    { type:"green", title:"宝くじ", subtitle:"宝くじが発売された！", icon:"gift",
-      options:[ {label:"A",text:"買う（当たれば5,000円）",cost:3000,lottery:true},{label:"B",text:"買わない",cost:0} ] },
-    { type:"green", title:"新聞", subtitle:"新聞を買いませんか？と誘われた", icon:"book",
-      options:[ {label:"A",text:"買う（1か月分）",cost:3000},{label:"B",text:"買わない",cost:0} ] },
-    { type:"green", title:"ライブ", subtitle:"好きなアーティストのライブ！", icon:"festival",
-      options:[ {label:"A",text:"行く！",cost:5000},{label:"B",text:"後からDVDで見る",cost:3000},{label:"C",text:"行かない",cost:0} ] },
-    { type:"green", title:"熱帯魚", subtitle:"一人暮らしが少し寂しい…", icon:"heart",
-      options:[ {label:"A",text:"飼う",cost:10000},{label:"B",text:"写真集で癒やされる",cost:3000},{label:"C",text:"飼わない",cost:0} ] },
-    { type:"green", title:"飲み会", subtitle:"職場の人に飲み会に誘われた", icon:"food",
-      options:[ {label:"A",text:"参加する",cost:3000},{label:"B",text:"参加しない",cost:0} ] },
-    { type:"green", title:"ドライヤー", subtitle:"ドライヤーが壊れた！", icon:"bulb",
-      options:[ {label:"A",text:"いい物に買い替える",cost:6000},{label:"B",text:"安く買い替える",cost:3000},{label:"C",text:"修理する",cost:1000} ] },
-    { type:"green", title:"ゲーム課金", subtitle:"新しいアイテムが追加された！", icon:"phone",
-      options:[ {label:"A",text:"課金して手に入れる",cost:2000},{label:"B",text:"課金しないで遊ぶ",cost:0} ] },
-    { type:"green", title:"散髪", subtitle:"そろそろ髪を切りたいなぁ…", icon:"shoe",
-      options:[ {label:"A",text:"流行の髪型に（シャンプー付）",cost:5000},{label:"B",text:"カットだけ",cost:1000},{label:"C",text:"自分でカット",cost:0} ] },
-    { type:"green", title:"結婚祝い", subtitle:"親友が結こん♡", icon:"gift",
-      options:[ {label:"A",text:"結こん式に出席する",cost:30000},{label:"B",text:"結こん祝いを贈る",cost:10000},{label:"C",text:"SNSで伝える",cost:0} ] },
-    { type:"green", title:"シャンプー", subtitle:"シャンプーが無くなった", icon:"bulb",
-      options:[ {label:"A",text:"美容院でやさしいもの",cost:5000},{label:"B",text:"お買い得（3個）",cost:2000},{label:"C",text:"ふつうに買う（1個）",cost:1000} ] },
-    { type:"green", title:"風邪", subtitle:"咳がでる。風邪をひいたかな？", icon:"heart",
-      options:[ {label:"A",text:"病院で薬をもらう",cost:3000},{label:"B",text:"薬局で風邪薬を買う",cost:1000},{label:"C",text:"家で休む",cost:0} ] },
-    { type:"green", title:"コンビニ", subtitle:"仕事帰りにコンビニへ寄った", icon:"food",
-      options:[ {label:"A",text:"お弁当とスープを買う",cost:2000},{label:"B",text:"新発売のスイーツを買う",cost:1000},{label:"C",text:"何も買わない",cost:0} ] },
-    { type:"green", title:"テレビ", subtitle:"テレビが故障した！", icon:"phone",
-      options:[ {label:"A",text:"新品に買い替える",cost:30000},{label:"B",text:"中古品を買う",cost:10000},{label:"C",text:"買い替えない",cost:0} ] },
-    { type:"green", title:"予防接種", subtitle:"インフルエンザの予防接種", icon:"heart",
-      options:[ {label:"A",text:"受ける",cost:3000},{label:"B",text:"受けない",cost:0} ] },
-    { type:"green", title:"同窓会", subtitle:"数年ぶりの同窓会", icon:"festival",
-      options:[ {label:"A",text:"行く！",cost:5000},{label:"B",text:"オンラインで出席",cost:1000},{label:"C",text:"行かない",cost:0} ] },
-    { type:"green", title:"エアコン", subtitle:"エアコンが故障した！", icon:"bulb",
-      options:[ {label:"A",text:"新品に交換",cost:30000},{label:"B",text:"修理する",cost:5000},{label:"C",text:"実家の扇風機をもらう",cost:0} ] },
-    { type:"green", title:"ケーキ", subtitle:"仕事をめちゃくちゃ頑張った！", icon:"cake",
-      options:[ {label:"A",text:"ちょっと高級なケーキ",cost:2000},{label:"B",text:"いつものケーキ",cost:1000},{label:"C",text:"今日はがまん",cost:0} ] },
-    { type:"green", title:"Tシャツ", subtitle:"お揃いでTシャツを買おうと誘われた", icon:"shoe",
-      options:[ {label:"A",text:"おすすめのものを買う",cost:5000},{label:"B",text:"もう少し安いものを提案",cost:3000},{label:"C",text:"買わない",cost:0} ] },
+  /* カード */
+  .cardback{
+    width:180px; height:250px; margin:10px auto; border-radius:18px;
+    background:repeating-linear-gradient(45deg,#2e8b57,#2e8b57 12px,#27794b 12px,#27794b 24px);
+    border:4px solid #fff; box-shadow:0 6px 16px rgba(0,0,0,.15);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    color:#fff; font-size:18px; font-weight:700; transition:transform .1s;
+  }
+  .cardback:active{ transform:scale(0.97); }
+  .cardback .qm{ font-size:64px; }
 
-    { type:"green", title:"資格", subtitle:"勉強すれば将来役に立つかも？", icon:"up",
-      options:[ {label:"A",text:"勉強する（資格がとれる）",cost:5000,setsFlag:"shikaku"},{label:"B",text:"今は勉強しない",cost:0} ] },
-    { type:"green", title:"医りょう保険", subtitle:"けがや病気が心配…", icon:"heart",
-      options:[ {label:"A",text:"保険に入って備える（1か月分）",cost:5000,setsFlag:"hoken"},{label:"B",text:"入らない",cost:0} ] },
-    { type:"green", title:"パソコン", subtitle:"新しいパソコンが発売された", icon:"phone",
-      options:[ {label:"A",text:"一括で買う",cost:50000},{label:"B",text:"ローンで買う（今回12,000円・総額60,000円）",cost:12000,note:"ローンは総額が高くなるよ"},{label:"C",text:"買わない",cost:0} ] },
-    { type:"green", title:"車（高額）", subtitle:"前から欲しかった車（150万円）！", icon:"bus",
-      options:[ {label:"A",text:"銀行ローンで買う（今回30,000円・約4年）",cost:30000,note:"長いあいだ払い続けるよ"},{label:"B",text:"買わない",cost:0} ] },
-    { type:"green", title:"入院", subtitle:"転んで大けが！入院が必要に", icon:"heart",
-      options:[ {label:"A",text:"入院費を払う",cost:30000},{label:"B",text:"保険金で支払う（保険に入っている人）",cost:0,onlyIfFlag:"hoken"} ] },
+  .gamecard{ border-radius:18px; overflow:hidden; border:1px solid var(--line); }
+  .gc-head{ padding:16px 18px 14px; color:#fff; text-align:center; }
+  .gc-head .ic{ font-size:34px; line-height:1; }
+  .gc-head h2{ margin:6px 0 2px; font-size:24px; font-weight:700; }
+  .gc-head .sub{ font-size:14px; opacity:.95; font-weight:400; }
+  .gc-green{ background:var(--green); }
+  .gc-yellow{ background:var(--yellow); color:#5a4500; }
+  .gc-yellow .sub{ color:#5a4500; }
+  .gc-red{ background:var(--red); }
+  .gc-body{ background:#fff; padding:16px; }
 
-    { type:"yellow", title:"就職祝い", subtitle:"祖父母から就職祝いをいただいた！", icon:"gift", gain:20000, gainLabel:"お祝い" },
-    { type:"yellow", title:"落とし物のお礼", subtitle:"落とし物を届けたらお礼が", icon:"gift", gain:10000, gainLabel:"お礼" },
-    { type:"yellow", title:"不用品を売る", subtitle:"家の掃除で使わないものを売った", icon:"up", gain:5000, gainLabel:"売れた" },
-    { type:"yellow", title:"お米", subtitle:"スーパーでお米が安売り！", icon:"food", gain:3000, gainLabel:"浮いた", requireExpense:{key:"food", label:"C", reason:"自炊を選んだ人は食費が浮いた"} },
-    { type:"yellow", title:"ランクアップ", subtitle:"資格を持っている人はランクアップ！", icon:"up", gain:10000, gainLabel:"ボーナス", requireFlag:"shikaku", noFlagText:"資格がないので 今回は ボーナスなし" },
+  .choice{
+    width:100%; border:2px solid var(--line); background:#fff; border-radius:12px;
+    padding:14px; margin-bottom:10px; cursor:pointer; font-family:inherit;
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
+    font-size:16px; text-align:left; transition:all .12s;
+  }
+  .choice .ci{ display:flex; align-items:center; gap:10px; }
+  .choice .badge{ width:26px; height:26px; border-radius:50%; color:#fff; font-weight:700; font-size:14px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+  .choice .amt{ font-weight:700; white-space:nowrap; }
+  .choice.A .badge{ background:var(--red); }
+  .choice.B .badge{ background:var(--green); }
+  .choice.C .badge{ background:var(--blue); }
+  .choice:active{ transform:scale(0.99); }
+  .choice.picked{ border-color:var(--green); background:var(--ok-bg); }
+  .choice:disabled{ opacity:.5; cursor:default; }
 
-    { type:"fukubiki", title:"福引き", subtitle:"スーパーで福引きに挑戦！", icon:"gift", win:5000, lose:0 },
+  .bigbox{ border-radius:12px; padding:18px; text-align:center; margin-bottom:4px; }
+  .bigbox .k{ font-size:14px; margin-bottom:6px; }
+  .bigbox .v{ font-size:26px; font-weight:700; }
+  .box-info{ background:var(--info-bg); } .box-info .k,.box-info .v{ color:var(--info-tx); }
+  .box-ok{ background:var(--ok-bg); } .box-ok .k,.box-ok .v{ color:var(--ok-tx); }
+  .box-warn{ background:var(--warn-bg); } .box-warn .k,.box-warn .v{ color:var(--warn-tx); }
 
-    { type:"red", title:"水もれ", subtitle:"自宅で水もれ発生！", icon:"water", cost:10000, costLabel:"修理代" },
-    { type:"red", title:"アパートの鍵", subtitle:"アパートの鍵をなくした！", icon:"home", cost:20000, costLabel:"鍵の交換工事" },
-    { type:"red", title:"車の修理", subtitle:"車が壊れた！", icon:"bus", cost:5000, costLabel:"車の修理", requireExpense:{key:"move", label:"A", reason:"「自分の車」を選んだ人だけ"} }
-  ],
+  .resultmsg{ margin-top:14px; padding:14px; border-radius:12px; text-align:center; font-size:16px; }
 
-  ENDING: {
-    plus: {
-      heading:"じょうずに やりくりできたね！",
-      body:"でも、まいつき いつも プラスにできるとは かぎりません。これから 入ってくるお金と 出ていくお金を 予想しながら 使うしゅうかんが、しょうらいの あなたを たすけてくれます。"
-    },
-    minus: {
-      heading:"マイナスでも、しっぱいじゃないよ",
-      body:"今回は たまたま 出ていくお金が 多かっただけ。大切なのは「つぎは どうしようかな」と 考えられること。ふだんから 先のお金を 予想しながら くらせば、ちゃんと 立てなおせます。"
-    },
-    common:"お金は、これからのことを 考えながら 使うと、こわくない。"
+  /* 結論 */
+  .ending{ text-align:center; padding-top:10px; }
+  .ending .big{ font-size:30px; font-weight:700; }
+  .ending .big.plus{ color:var(--green); }
+  .ending .big.minus{ color:var(--blue); }
+  .endhead{ font-size:22px; font-weight:700; margin:18px 0 10px; }
+  .endbody{ font-size:16px; text-align:left; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
+  .endcommon{ font-size:18px; font-weight:700; margin:18px 0; color:var(--green-d); }
+
+  .progress{ text-align:center; font-size:13px; color:var(--muted); margin:14px 0 4px; }
+
+  /* 演出（プラス・マイナスのフィードバック） */
+  @keyframes flashPlus{ 0%{background:#e7f5ec;} 100%{background:var(--card);} }
+  @keyframes shakeMinus{ 0%,100%{transform:translateX(0);} 25%{transform:translateX(-4px);} 75%{transform:translateX(4px);} }
+  @keyframes shakeBig{ 0%,100%{transform:translateX(0);} 15%{transform:translateX(-7px);} 30%{transform:translateX(6px);} 45%{transform:translateX(-5px);} 60%{transform:translateX(4px);} 75%{transform:translateX(-2px);} }
+  .fx-plus{ animation:flashPlus .8s ease; }
+  .fx-minus{ animation:shakeMinus .35s ease; }
+  .fx-bigminus{ animation:shakeBig .55s ease; }
+  @media (prefers-reduced-motion: reduce){
+    .fx-plus,.fx-minus,.fx-bigminus{ animation:none; }
   }
 
-};
+  /* 難易度選択 */
+  .diffrow{ display:flex; gap:8px; margin-top:14px; }
+  .diffbtn{ flex:1; border:2px solid var(--line); background:#fff; border-radius:12px; padding:12px 6px; font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; color:var(--muted); }
+  .diffbtn.on{ border-color:var(--green); background:var(--ok-bg); color:var(--green-d); }
+  .difflabel{ text-align:center; font-size:13px; color:var(--muted); margin:14px 0 2px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- メニュー -->
+  <section class="screen active" id="s-menu">
+    <h1>マネープランゲーム</h1>
+    <p class="lead">お金の つかいかたを かんがえよう</p>
+    <div class="panel">
+      <p class="difflabel">むずかしさを えらぼう</p>
+      <div class="diffrow">
+        <button class="diffbtn" id="diff-easy" onclick="GAME.setDiff('easy')">やさしい</button>
+        <button class="diffbtn on" id="diff-normal" onclick="GAME.setDiff('normal')">ふつう</button>
+        <button class="diffbtn" id="diff-hard" onclick="GAME.setDiff('hard')">むずかしい</button>
+      </div>
+      <p style="text-align:center; margin:16px 0 4px; font-size:16px;">どこから はじめる？</p>
+      <div class="btn-row">
+        <button class="btn btn-sub" onclick="GAME.start('intro')">100まんえんの はなしから</button>
+        <button class="btn btn-primary" onclick="GAME.start('plan')">ゲームから はじめる</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 100万円アイスブレイク -->
+  <section class="screen" id="s-intro">
+    <h1>もしも 100まんえん</h1>
+    <p class="lead">あったら なにが ほしい？したい？</p>
+    <div class="panel">
+      <textarea id="introText" rows="5" placeholder="ここに かいてみよう（かかなくても OK）"
+        style="width:100%; border:2px solid var(--line); border-radius:12px; padding:12px; font-size:16px; font-family:inherit; resize:vertical;"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="GAME.goPlan()">つぎへ すすむ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- プラン選択 -->
+  <section class="screen" id="s-plan">
+    <h1>どんな くらしを する？</h1>
+    <p class="lead">5つの こうもくを 1つずつ えらんでね</p>
+    <div id="expList"></div>
+    <div class="summary">
+      <div class="srow"><span>お<ruby>給料<rt>きゅうりょう</rt></ruby></span><span class="v" id="sumSalary">150,000えん</span></div>
+      <div class="srow"><span>1か<ruby>月<rt>げつ</rt></ruby>の <ruby>合計<rt>ごうけい</rt></ruby></span><span class="v" id="sumTotal">—</span></div>
+      <div class="sdiv"></div>
+      <div class="srow free"><span><ruby>自由<rt>じゆう</rt></ruby>に つかえる お<ruby>金<rt>かね</rt></ruby></span><span class="v" id="sumFree">—</span></div>
+      <p class="hint" id="planHint">ぜんぶ えらぶと けいさんされるよ</p>
+      <div class="btn-row" id="planNext" style="display:none;">
+        <button class="btn btn-primary" onclick="GAME.startGame()">この くらしで ゲームへ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- カードゲーム -->
+  <section class="screen" id="s-game">
+    <div class="hud">
+      <div><div class="lbl">いまの ざんだか</div><div class="bal" id="gBal">0えん</div></div>
+      <div><div class="lbl">のこりカード</div><div class="rem" id="gRem">0まい</div></div>
+    </div>
+    <div id="gStage"></div>
+  </section>
+
+  <!-- 結論 -->
+  <section class="screen" id="s-end">
+    <div class="ending">
+      <div class="bigbox box-ok" style="margin-bottom:14px;">
+        <div class="k">1かげつ つかった けっか</div>
+        <div class="v" id="endBal">0えん</div>
+      </div>
+      <div class="big" id="endBig">—</div>
+      <div class="endhead" id="endHead"></div>
+      <div class="endbody" id="endBody"></div>
+      <div class="endcommon" id="endCommon"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="GAME.restart()">もう いちど あそぶ</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="config.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
