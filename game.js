@@ -275,7 +275,7 @@ const GAME = {
         ? '<div class="k">あたり！</div><div class="v">'+amt.toLocaleString('ja-JP')+'えん もらえたよ</div>'
         : '<div class="k">はずれ…</div><div class="v">0えん</div>';
       body.appendChild(box);
-      this.afterAction(body, '', win?'plus':'flat');
+      this.afterAction(body, '', win?'excited':'flat');
     };
     body.appendChild(b);
   },
@@ -353,15 +353,47 @@ const GAME = {
     body.appendChild(next);
   },
 
-  /* 演出フック（今は残高の色変化＋簡単な揺れ。あとでキャラ等に拡張） */
+  /* 演出フック（残高の色変化＋揺れ＋キャラのポップアップ） */
   playFx(kind){
     const hud = document.querySelector('.hud');
-    if(!hud) return;
-    hud.classList.remove('fx-plus','fx-minus','fx-bigminus');
-    void hud.offsetWidth; // リセット
-    if(kind==='plus') hud.classList.add('fx-plus');
-    else if(kind==='minus') hud.classList.add('fx-minus');
-    else if(kind==='bigminus') hud.classList.add('fx-bigminus');
+    if(hud){
+      hud.classList.remove('fx-plus','fx-minus','fx-bigminus');
+      void hud.offsetWidth; // リセット
+      if(kind==='plus') hud.classList.add('fx-plus');
+      else if(kind==='minus') hud.classList.add('fx-minus');
+      else if(kind==='bigminus') hud.classList.add('fx-bigminus');
+    }
+    this.popChar(kind);
+  },
+
+  /* どの演出で どのキャラを 出すか */
+  CHAR_FOR: {
+    plus:     'char-happy.png',     // お金が増えた
+    minus:    'char-sad.png',       // 出費
+    bigminus: 'char-sad.png',       // 大きな出費
+    excited:  'char-excited.png',   // 福引き・くじの当たり
+    flat:     'char-normal.png'     // 増減なし
+  },
+
+  /* 画面の真ん中に キャラを ふわっと出して 少ししたら消す */
+  popChar(kind){
+    const file = this.CHAR_FOR[kind];
+    if(!file) return;
+    const old = document.getElementById('charPop');
+    if(old) old.remove();
+    const pop = document.createElement('div');
+    pop.id = 'charPop';
+    pop.className = 'charpop ' + (kind==='plus'||kind==='excited' ? 'is-up'
+                      : (kind==='minus'||kind==='bigminus') ? 'is-down' : 'is-flat');
+    const img = document.createElement('img');
+    img.src = file;
+    img.alt = '';
+    pop.appendChild(img);
+    document.body.appendChild(pop);
+    // アニメ終了後に消す（flatは短め）
+    const life = (kind==='flat') ? 900 : 1300;
+    setTimeout(()=>{ pop.classList.add('out'); }, life - 250);
+    setTimeout(()=>{ if(pop.parentNode) pop.remove(); }, life);
   },
 
   pay(n){ this.balance -= n; this.refreshHud(); },
@@ -370,6 +402,8 @@ const GAME = {
   finish(){ this.endScreen(); },
 
   endScreen(){
+    const leftover = document.getElementById('charPop');
+    if(leftover) leftover.remove();
     const plus = this.balance >= 0;
     const e = CONFIG.ENDING;
     const m = plus ? e.plus : e.minus;
@@ -382,6 +416,12 @@ const GAME = {
     document.getElementById('endHead').textContent = m.heading;
     document.getElementById('endBody').textContent = m.body;
     document.getElementById('endCommon').textContent = e.common;
+    // 結果に合わせて キャラを出す（プラス=達成 / マイナス=励まし）
+    const endChar = document.getElementById('endChar');
+    if(endChar){
+      endChar.src = (plus ? 'char-clear.png' : 'char-encourage.png');
+      endChar.alt = '';
+    }
     this.show('end');
   },
 
