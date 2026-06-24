@@ -28,17 +28,17 @@ const GAME = {
     this.salary = CONFIG.SALARY;
     this.selections = {};
     this.flags = {};
-    this.diff = CONFIG.DIFFICULTY_SETS[CONFIG.DIFFICULTY] || CONFIG.DIFFICULTY_SETS.normal;
+    this.diff = CONFIG.DIFFICULTY_SETS[CONFIG.DIFFICULTY] || CONFIG.DIFFICULTY_SETS.easy;
     document.getElementById('sumSalary').textContent = yen(this.salary);
-    if(where==='intro'){ this.show('intro'); }
-    else { this.buildPlan(); this.show('plan'); }
+    this.buildPlan();
+    this.show('plan');
   },
 
   goPlan(){ this.buildPlan(); this.show('plan'); },
 
   setDiff(key){
     CONFIG.DIFFICULTY = key;
-    ['easy','normal','hard'].forEach(k=>{
+    ['easy','normal'].forEach(k=>{
       const b = document.getElementById('diff-'+k);
       if(b) b.classList.toggle('on', k===key);
     });
@@ -113,11 +113,40 @@ const GAME = {
   startGame(){
     this.balance = this.salary - this.planTotal();
     this.flags = {};
+    this.paidFixed = {};            // 支払い済みの固定費
     this.deck = this.buildDeck();
     this.idx = 0;
+    this.buildFixedBar();
     this.refreshHud();
     this.show('game');
     this.cardBack();
+  },
+
+  /* 固定費バーを作る（残高の下に常時表示） */
+  buildFixedBar(){
+    const bar = document.getElementById('fixedBar');
+    if(!bar) return;
+    bar.innerHTML = '';
+    CONFIG.PAYDAY_CARDS.forEach(pc => {
+      const exp = CONFIG.EXPENSES.find(e => e.key === pc.expenseKey);
+      const cost = exp ? this.optCost(pc.expenseKey) : 0;
+      const cell = document.createElement('div');
+      cell.className = 'fc';
+      cell.id = 'fc-' + pc.expenseKey;
+      const shortName = (exp && exp.name) ? exp.name : pc.title;
+      cell.innerHTML = '<span class="fcname">'+shortName+'</span>'
+        + '<span class="fcyen">'+cost.toLocaleString('ja-JP')+'</span>';
+      bar.appendChild(cell);
+    });
+  },
+
+  /* プランで選んだ その固定費の金額 */
+  optCost(key){
+    const lab = this.expenseLabel(key);
+    const exp = CONFIG.EXPENSES.find(e=>e.key===key);
+    if(!exp) return 0;
+    const o = exp.options.find(x=>x.label===lab);
+    return o ? o.cost : 0;
   },
 
   /* 山札を作る：CARDSからDRAW_COUNT枚を抽選し、支払日5枚をばらけて差し込む */
@@ -237,9 +266,9 @@ const GAME = {
         if(o.setsFlag){ this.flags[o.setsFlag] = true; }
         if(o.note){ extraMsg = (extraMsg?extraMsg+' ':'') + o.note; }
         const base = o.cost>0 ? (o.text+'を えらんで '+o.cost.toLocaleString('ja-JP')+'えん 払ったよ') : (o.text+'を えらんだよ（0えん）');
-        // 緑カードは「自分で選ぶ買い物」なので、泣き顔ではなく普通の顔。
+        // 緑カードは「自分で選ぶ買い物」。演出は出さない。
         // ただし宝くじに当たってお金が増えたときだけ、うれしい顔。
-        const fx = (o.lottery && extraMsg.indexOf('もらえた')>=0) ? 'plus' : 'calm';
+        const fx = (o.lottery && extraMsg.indexOf('もらえた')>=0) ? 'plus' : null;
         this.afterAction(body, extraMsg ? base+'／'+extraMsg : base, fx);
       };
       body.appendChild(b);
@@ -258,8 +287,21 @@ const GAME = {
     const b = document.createElement('button');
     b.className='btn btn-primary'; b.style.marginTop='12px';
     b.textContent = opt.cost.toLocaleString('ja-JP')+'えん 払う';
-    b.onclick = () => { b.disabled=true; this.pay(opt.cost); this.afterAction(body, '毎月の 固定費を 払ったよ', 'calm'); };
+    b.onclick = () => {
+      b.disabled=true;
+      this.pay(opt.cost);
+      this.markFixedPaid(card.expenseKey);
+      this.afterAction(body, '毎月の 固定費を 払ったよ', null);
+    };
     body.appendChild(b);
+  },
+
+  /* 固定費を 支払い済みにする */
+  markFixedPaid(key){
+    this.paidFixed = this.paidFixed || {};
+    this.paidFixed[key] = true;
+    const cell = document.getElementById('fc-'+key);
+    if(cell) cell.classList.add('paid');
   },
 
   renderFukubiki(card, body){
@@ -278,7 +320,7 @@ const GAME = {
         ? '<div class="k">あたり！</div><div class="v">'+amt.toLocaleString('ja-JP')+'えん もらえたよ</div>'
         : '<div class="k">はずれ…</div><div class="v">0えん</div>';
       body.appendChild(box);
-      this.afterAction(body, '', win?'excited':'flat');
+      this.afterAction(body, '', win?'excited':null);
     };
     body.appendChild(b);
   },
@@ -290,7 +332,7 @@ const GAME = {
       box.className='bigbox box-warn';
       box.innerHTML = '<div class="k">ざんねん</div><div class="v" style="font-size:18px;">'+(card.noFlagText||'今回は もらえません')+'</div>';
       body.appendChild(box);
-      this.afterAction(body, '', 'flat'); return;
+      this.afterAction(body, '', null); return;
     }
     if(card.requireExpense){
       const got = this.expenseLabel(card.requireExpense.key) === card.requireExpense.label;
@@ -299,7 +341,7 @@ const GAME = {
         box.className='bigbox box-warn';
         box.innerHTML = '<div class="k">ざんねん</div><div class="v" style="font-size:16px;">'+card.requireExpense.reason+'<br>今回は もらえません</div>';
         body.appendChild(box);
-        this.afterAction(body, '', 'flat'); return;
+        this.afterAction(body, '', null); return;
       }
     }
     const box = document.createElement('div');
@@ -324,7 +366,7 @@ const GAME = {
         box.className='bigbox box-ok';
         box.innerHTML = '<div class="k">セーフ！</div><div class="v" style="font-size:16px;">'+card.requireExpense.reason+'<br>あなたは 払わなくて OK</div>';
         body.appendChild(box);
-        this.afterAction(body, '', 'calm'); return;
+        this.afterAction(body, '', null); return;
       }
     }
     const box = document.createElement('div');
@@ -339,10 +381,9 @@ const GAME = {
     body.appendChild(b);
   },
 
-  fxForPay(cost){ return cost >= 20000 ? 'bigminus' : (cost>0 ? 'minus' : 'flat'); },
+  fxForPay(cost){ return cost >= 20000 ? 'bigminus' : (cost>0 ? 'minus' : null); },
 
   afterAction(body, msg, fx){
-    if(fx) this.playFx(fx);
     if(msg){
       const m = document.createElement('div');
       m.className='resultmsg'; m.style.color='var(--muted)';
@@ -354,9 +395,15 @@ const GAME = {
     next.textContent = (this.idx+1 >= this.deck.length) ? 'けっかを みる' : 'つぎの カードへ';
     next.onclick = () => { this.idx++; this.refreshHud(); this.cardBack(); };
     body.appendChild(next);
+    if(fx){
+      // 演出を出している間は「つぎへ」を隠し、消えてから出す
+      next.style.display = 'none';
+      const life = this.playFx(fx);
+      setTimeout(()=>{ next.style.display = ''; }, life);
+    }
   },
 
-  /* 演出フック（残高の色変化＋揺れ＋キャラのポップアップ） */
+  /* 演出フック（残高の色変化＋揺れ＋キャラのポップアップ）。表示時間(ms)を返す */
   playFx(kind){
     const hud = document.querySelector('.hud');
     if(hud){
@@ -366,7 +413,7 @@ const GAME = {
       else if(kind==='minus') hud.classList.add('fx-minus');
       else if(kind==='bigminus') hud.classList.add('fx-bigminus');
     }
-    this.popChar(kind);
+    return this.popChar(kind);
   },
 
   /* どの演出で どのキャラを 出すか */
@@ -379,10 +426,10 @@ const GAME = {
     flat:     'char-normal.png'     // 増減なし
   },
 
-  /* 画面の真ん中に キャラを ふわっと出して 少ししたら消す */
+  /* 画面の真ん中に キャラを ふわっと出して 少ししたら消す。表示時間(ms)を返す */
   popChar(kind){
     const file = this.CHAR_FOR[kind];
-    if(!file) return;
+    if(!file) return 0;
     const old = document.getElementById('charPop');
     if(old) old.remove();
     const pop = document.createElement('div');
@@ -394,10 +441,11 @@ const GAME = {
     img.alt = '';
     pop.appendChild(img);
     document.body.appendChild(pop);
-    // 表示時間（少し長めに）
-    const life = 2200;
-    setTimeout(()=>{ pop.classList.add('out'); }, life - 350);
+    // 表示時間（短め）
+    const life = 1400;
+    setTimeout(()=>{ pop.classList.add('out'); }, life - 300);
     setTimeout(()=>{ if(pop.parentNode) pop.remove(); }, life);
+    return life;
   },
 
   pay(n){ this.balance -= n; this.refreshHud(); },
@@ -410,20 +458,23 @@ const GAME = {
     if(leftover) leftover.remove();
     const plus = this.balance >= 0;
     const e = CONFIG.ENDING;
-    const m = plus ? e.plus : e.minus;
+    // 10万円を超えるマイナスは「つかいすぎ」メッセージ
+    const threshold = (e.bigMinusThreshold !== undefined) ? e.bigMinusThreshold : 100000;
+    const bigMinus = (this.balance < 0) && (Math.abs(this.balance) > threshold);
+    const m = plus ? e.plus : (bigMinus && e.bigminus ? e.bigminus : e.minus);
     const balEl = document.getElementById('endBal');
     balEl.textContent = yen(this.balance);
     balEl.classList.toggle('neg', this.balance<0);
     const big = document.getElementById('endBig');
-    big.textContent = plus ? 'プラスで おわったね' : 'マイナスで おわったね';
+    big.textContent = plus ? 'プラスで おわったね' : (bigMinus ? 'つかいすぎ かも…' : 'マイナスで おわったね');
     big.className = 'big '+(plus?'plus':'minus');
     document.getElementById('endHead').textContent = m.heading;
     document.getElementById('endBody').textContent = m.body;
     document.getElementById('endCommon').textContent = e.common;
-    // 結果に合わせて キャラを出す（プラス=達成 / マイナス=励まし）
+    // 結果に合わせて キャラを出す（プラス=達成 / 大マイナス=泣き顔 / マイナス=励まし）
     const endChar = document.getElementById('endChar');
     if(endChar){
-      endChar.src = (plus ? 'char-clear.png' : 'char-encourage.png');
+      endChar.src = plus ? 'char-clear.png' : (bigMinus ? 'char-sad.png' : 'char-encourage.png');
       endChar.alt = '';
     }
     this.show('end');
