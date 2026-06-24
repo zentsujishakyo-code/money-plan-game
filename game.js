@@ -261,7 +261,7 @@ const GAME = {
     stage.innerHTML = '';
     const wrap = document.createElement('div');
     wrap.className = 'gamecard';
-    const headClass = (card.type==='yellow'||card.type==='fukubiki') ? 'gc-yellow'
+    const headClass = (card.type==='yellow'||card.type==='fukubiki'||card.type==='lottery_result') ? 'gc-yellow'
                     : (card.type==='red') ? 'gc-red' : 'gc-green';
     const ic = ICONS[card.icon] || '💴';
     wrap.innerHTML = '<div class="gc-head '+headClass+'">'
@@ -279,6 +279,7 @@ const GAME = {
     else if(card.type==='fukubiki') this.renderFukubiki(card, body);
     else if(card.type==='yellow') this.renderYellow(card, body);
     else if(card.type==='red') this.renderRed(card, body);
+    else if(card.type==='lottery_result') this.renderLotteryResult(card, body);
   },
 
   renderGreen(card, body){
@@ -312,10 +313,8 @@ const GAME = {
     let extraMsg = '';
     if(o.lottery){
       this.pay(o.cost);
-      // 宝くじ：実際の宝くじのように めったに当たらない。当たれば 50,000円
-      const win = Math.random() < 0.01;
-      if(win){ this.gain(50000); extraMsg = 'なんと 大当たり！50,000えん もらえた！'; }
-      else { extraMsg = 'ざんねん、はずれ…'; }
+      this.scheduleLottery();   // 3枚あとに 抽選結果カードを差し込む
+      extraMsg = '宝くじを 買ったよ。3まい あとに 抽選が あるよ！';
     } else {
       this.pay(o.cost);
     }
@@ -326,9 +325,42 @@ const GAME = {
     if(o.note){ extraMsg = (extraMsg?extraMsg+' ':'') + o.note; }
     const base = o.cost>0 ? (o.text+'を えらんで '+o.cost.toLocaleString('ja-JP')+'えん 払ったよ') : (o.text+'を えらんだよ（0えん）');
     // 緑カードは「自分で選ぶ買い物」。演出は出さない。
-    // ただし宝くじに当たってお金が増えたときだけ、うれしい顔。
-    const fx = (o.lottery && extraMsg.indexOf('もらえた')>=0) ? 'excited' : null;
-    this.afterAction(body, extraMsg ? base+'／'+extraMsg : base, fx);
+    this.afterAction(body, extraMsg ? base+'／'+extraMsg : base, null);
+  },
+
+  /* 宝くじ：当落を今のうちに決めて、抽選結果カードを delay 枚あとに差し込む */
+  scheduleLottery(){
+    const L = CONFIG.LOTTERY;
+    const win = Math.random() < L.winRate;
+    const resultCard = { type:'lottery_result', title:'宝くじの 抽選日！', icon:'gift', _win:win };
+    const at = this.idx + 1 + L.delay;   // 今のカードの delay 枚あと
+    const pos = Math.min(at, this.deck.length);
+    this.deck.splice(pos, 0, resultCard);
+    this.refreshHud();
+  },
+
+  /* 宝くじの抽選結果カードを表示 */
+  renderLotteryResult(card, body){
+    const L = CONFIG.LOTTERY;
+    const win = card._win;
+    const box = document.createElement('div');
+    box.className = 'bigbox '+(win?'box-ok':'box-warn');
+    box.style.marginBottom = '12px';
+    box.innerHTML = win
+      ? '<div class="k">大当たり！</div><div class="v">'+L.prize.toLocaleString('ja-JP')+'えん 当たった！</div>'
+      : '<div class="k">はずれ…</div><div class="v">買った '+L.cost.toLocaleString('ja-JP')+'えんは もどってきません</div>';
+    body.appendChild(box);
+
+    // 確率の説明（ゲーム内＋本物）
+    const note = document.createElement('div');
+    note.className = 'lottery-note';
+    note.innerHTML =
+      '<p>'+L.inGameText+'</p>'
+      + '<p>'+L.realText+'</p>';
+    body.appendChild(note);
+
+    if(win) this.gain(L.prize);
+    this.afterAction(body, '', win?'excited':'minus');
   },
 
   /* マイナスになる買い物の確認ダイアログ */
