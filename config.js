@@ -26,12 +26,11 @@ const CONFIG = {
   DRAW_COUNT: 15,
   FUKUBIKI_WIN_RATE: 0.45,
   SPREAD_PAYDAY: true,
-  DIFFICULTY: "normal",
+  DIFFICULTY: "easy",
 
   DIFFICULTY_SETS: {
-    easy:   { drawCount: 12, luckyBoost: 2,  fukubikiWin: 0.6,  hiCap: 1 },
-    normal: { drawCount: 15, luckyBoost: 1,  fukubikiWin: 0.45, hiCap: 2 },
-    hard:   { drawCount: 18, luckyBoost: -1, fukubikiWin: 0.3,  hiCap: 3 }
+    easy:   { drawCount: 12, luckyBoost: 2, fukubikiWin: 0.6,  hiCap: 1 },
+    normal: { drawCount: 15, luckyBoost: 1, fukubikiWin: 0.45, hiCap: 2 }
   },
 
   EXPENSES: [
@@ -93,13 +92,13 @@ const CONFIG = {
     { type:"green", title:"マンガ", subtitle:"話題のマンガの新刊が発売！", icon:"book",
       options:[ {label:"A",text:"新刊を買う",cost:2000},{label:"B",text:"レンタルで読む",cost:1000},{label:"C",text:"友達に借りて読む",cost:0} ] },
     { type:"green", title:"募金", subtitle:"大きな災害が発生！募金活動中", icon:"heart",
-      options:[ {label:"A",text:"募金する",cost:5000},{label:"B",text:"ボランティアに行く（交通費）",cost:3000},{label:"C",text:"何もしない",cost:0} ] },
+      options:[ {label:"A",text:"募金する",cost:5000},{label:"B",text:"ボランティアに行く（交通費）",cost:3000},{label:"C",text:"今回は被災地の復興を祈る",cost:0} ] },
     { type:"green", title:"スマホ", subtitle:"スマホの新機種が発売！", icon:"phone",
       options:[ {label:"A",text:"新機種を買う",cost:50000},{label:"B",text:"一つ前の機種を買う",cost:30000},{label:"C",text:"買わない",cost:0} ] },
     { type:"green", title:"お花見", subtitle:"会社の人にお花見に誘われた♪", icon:"festival",
       options:[ {label:"A",text:"みんなでご飯を食べる",cost:5000},{label:"B",text:"お花を見るだけ（交通費）",cost:1000},{label:"C",text:"参加しない",cost:0} ] },
     { type:"green", title:"ピザ", subtitle:"季節限定のピザが発売された", icon:"food",
-      options:[ {label:"A",text:"宅配してもらう",cost:3000},{label:"B",text:"お店へ取りにいく",cost:2000},{label:"C",text:"自分で作る",cost:1000} ] },
+      options:[ {label:"A",text:"宅配してもらう",cost:3000},{label:"B",text:"お店へ取りにいく",cost:2000},{label:"C",text:"今回は買わない",cost:0} ] },
     { type:"green", title:"宝くじ", subtitle:"宝くじが発売された！", icon:"gift",
       options:[ {label:"A",text:"買う（当たれば5,000円）",cost:3000,lottery:true},{label:"B",text:"買わない",cost:0} ] },
     { type:"green", title:"新聞", subtitle:"新聞を買いませんか？と誘われた", icon:"book",
@@ -170,6 +169,11 @@ const CONFIG = {
       heading:"マイナスでも、しっぱいじゃないよ",
       body:"今回は たまたま 出ていくお金が 多かっただけ。大切なのは「つぎは どうしようかな」と 考えられること。ふだんから 先のお金を 予想しながら くらせば、ちゃんと 立てなおせます。"
     },
+    bigminus: {
+      heading:"つかいすぎ かもしれません",
+      body:"出ていくお金が 入ってくるお金より ずっと 多くなっています。ほしいもの 全部を 買うのではなく、「いま 本当に ひつようかな？」と 立ち止まって 考えることが 大切です。お金は つかうまえに かんがえると、あとで こまりません。"
+    },
+    bigMinusThreshold: 100000,
     common:"お金は、これからのことを 考えながら 使うと、こわくない。"
   }
 

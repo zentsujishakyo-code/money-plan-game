@@ -199,39 +199,43 @@
   .diffbtn{ flex:1; border:2px solid var(--line); background:#fff; border-radius:12px; padding:12px 6px; font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; color:var(--muted); }
   .diffbtn.on{ border-color:var(--green); background:var(--ok-bg); color:var(--green-d); }
   .difflabel{ text-align:center; font-size:13px; color:var(--muted); margin:14px 0 2px; }
+
+  /* タイトル画像 */
+  .titleimg{ display:block; width:100%; max-width:380px; height:auto; margin:0 auto 4px; border-radius:14px; }
+
+  /* 固定費バー（常時表示） */
+  .fixedbar{ display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px; }
+  .fixedbar .fc{
+    flex:1 1 calc(20% - 6px); min-width:60px;
+    border:1.5px solid var(--line); border-radius:10px;
+    background:#fff; padding:6px 4px; text-align:center; font-size:11px; line-height:1.3;
+    color:var(--muted); position:relative;
+  }
+  .fixedbar .fc .fcname{ font-weight:700; color:var(--ink); display:block; font-size:11px; }
+  .fixedbar .fc .fcyen{ font-size:11px; }
+  .fixedbar .fc.paid{ border-color:var(--green); background:var(--ok-bg); color:var(--green-d); }
+  .fixedbar .fc.paid .fcname{ color:var(--green-d); }
+  .fixedbar .fc.paid::after{
+    content:"✓ すみ"; position:absolute; top:-7px; right:-3px;
+    background:var(--green); color:#fff; font-size:9px; font-weight:700;
+    padding:1px 5px; border-radius:8px;
+  }
 </style>
 </head>
 <body>
 <div id="app">
 
-  <!-- メニュー -->
+  <!-- メニュー（タイトル画面） -->
   <section class="screen active" id="s-menu">
-    <h1>マネープランゲーム</h1>
-    <p class="lead">お金の つかいかたを かんがえよう</p>
+    <img class="titleimg" src="title.jpg" alt="マネープランゲーム">
     <div class="panel">
       <p class="difflabel">むずかしさを えらぼう</p>
       <div class="diffrow">
-        <button class="diffbtn" id="diff-easy" onclick="GAME.setDiff('easy')">やさしい</button>
-        <button class="diffbtn on" id="diff-normal" onclick="GAME.setDiff('normal')">ふつう</button>
-        <button class="diffbtn" id="diff-hard" onclick="GAME.setDiff('hard')">むずかしい</button>
+        <button class="diffbtn on" id="diff-easy" onclick="GAME.setDiff('easy')">かんたん</button>
+        <button class="diffbtn" id="diff-normal" onclick="GAME.setDiff('normal')">ふつう</button>
       </div>
-      <p style="text-align:center; margin:16px 0 4px; font-size:16px;">どこから はじめる？</p>
       <div class="btn-row">
-        <button class="btn btn-sub" onclick="GAME.start('intro')">100まんえんの はなしから</button>
-        <button class="btn btn-primary" onclick="GAME.start('plan')">ゲームから はじめる</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- 100万円アイスブレイク -->
-  <section class="screen" id="s-intro">
-    <h1>もしも 100まんえん</h1>
-    <p class="lead">あったら なにが ほしい？したい？</p>
-    <div class="panel">
-      <textarea id="introText" rows="5" placeholder="ここに かいてみよう（かかなくても OK）"
-        style="width:100%; border:2px solid var(--line); border-radius:12px; padding:12px; font-size:16px; font-family:inherit; resize:vertical;"></textarea>
-      <div class="btn-row">
-        <button class="btn btn-primary" onclick="GAME.goPlan()">つぎへ すすむ</button>
+        <button class="btn btn-primary" onclick="GAME.start('plan')">ゲームを はじめる</button>
       </div>
     </div>
   </section>
@@ -259,6 +263,7 @@
       <div><div class="lbl">いまの ざんだか</div><div class="bal" id="gBal">0えん</div></div>
       <div><div class="lbl">のこりカード</div><div class="rem" id="gRem">0まい</div></div>
     </div>
+    <div class="fixedbar" id="fixedBar"></div>
     <div id="gStage"></div>
   </section>
 
