@@ -33,6 +33,16 @@ const CONFIG = {
     normal: { drawCount: 15, luckyBoost: 1, fukubikiWin: 0.45, hiCap: 2 }
   },
 
+  /* 宝くじの設定（あとで調整しやすいように ここにまとめる） */
+  LOTTERY: {
+    cost: 3000,            // 購入金額
+    prize: 50000,          // 当選金額
+    winRate: 0.01,         // ゲーム内の当選確率（1% = 100回に1回くらい）
+    delay: 3,              // 何枚あとに 抽選結果を出すか
+    inGameText: "このゲームでは あたりやすく していて「100回に 1回」くらい あたります。",
+    realText: "本物の 宝くじ（1等）は「2000万まいに 1まい」。日本じゅうの 人が 買っても、当たるのは ほんの 数人です。"
+  },
+
   /* 貯金チャレンジのコース（目標として残したい金額） */
   SAVING_COURSES: [
     { key:"hi",  label:"たくさん のこす",     ruby:"たくさん のこす",     goal:20000, sub:"20,000えん いじょう" },
@@ -107,7 +117,7 @@ const CONFIG = {
     { type:"green", title:"ピザ", subtitle:"季節限定のピザが発売された", icon:"food",
       options:[ {label:"A",text:"宅配してもらう",cost:3000},{label:"B",text:"お店へ取りにいく",cost:2000},{label:"C",text:"今回は買わない",cost:0} ] },
     { type:"green", title:"宝くじ", subtitle:"宝くじが発売された！", icon:"gift",
-      options:[ {label:"A",text:"買う（当たれば5,000円）",cost:3000,lottery:true},{label:"B",text:"買わない",cost:0} ] },
+      options:[ {label:"A",text:"買う（3まいあと 抽選）",cost:3000,lottery:true},{label:"B",text:"買わない",cost:0} ] },
     { type:"green", title:"新聞", subtitle:"新聞を買いませんか？と誘われた", icon:"book",
       options:[ {label:"A",text:"買う（1か月分）",cost:3000},{label:"B",text:"買わない",cost:0} ] },
     { type:"green", title:"ライブ", subtitle:"好きなアーティストのライブ！", icon:"festival",
