@@ -57,19 +57,29 @@
 
   /* プラン選択 */
   .exp{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:12px; }
-  .exp h3{ margin:0 0 12px; font-size:19px; font-weight:700; }
+  .exp h3{ margin:0 0 12px; font-size:19px; font-weight:700; display:flex; align-items:center; gap:8px; }
+  .exp h3 .exp-ic{ font-size:24px; line-height:1; }
   .opts{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
   .opt{
     border:2px solid var(--line); background:#fff; border-radius:12px;
-    padding:12px 6px; cursor:pointer; text-align:center;
-    display:flex; flex-direction:column; gap:4px; min-height:92px;
-    justify-content:center; font-family:inherit; transition:all .12s;
+    padding:12px 6px 10px; cursor:pointer; text-align:center;
+    display:flex; flex-direction:column; gap:5px; min-height:96px;
+    justify-content:flex-start; align-items:center; font-family:inherit; transition:all .12s;
   }
-  .opt .tag{ font-size:13px; font-weight:700; color:var(--muted); }
+  .opt .tag{
+    width:24px; height:24px; border-radius:50%; color:#fff;
+    font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center;
+  }
+  .opt-A .tag{ background:var(--red); }
+  .opt-B .tag{ background:var(--green); }
+  .opt-C .tag{ background:var(--blue); }
   .opt .nm{ font-size:14px; line-height:1.25; color:var(--ink); }
-  .opt .pr{ font-size:14px; font-weight:700; color:var(--muted); }
-  .opt.sel{ border-color:var(--green); background:var(--ok-bg); }
-  .opt.sel .tag, .opt.sel .pr{ color:var(--green-d); }
+  .opt .pr{ font-size:14px; font-weight:700; color:var(--muted); margin-top:auto; }
+  .opt-A{ border-color:#f3c9c2; }
+  .opt-B{ border-color:#c2e3cb; }
+  .opt-C{ border-color:#c2d4e8; }
+  .opt.sel{ border-color:var(--green); background:var(--ok-bg); border-width:2px; box-shadow:0 0 0 2px var(--green-d) inset; }
+  .opt.sel .pr{ color:var(--green-d); }
 
   .summary{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-top:6px; }
   .srow{ display:flex; justify-content:space-between; align-items:center; padding:5px 0; font-size:16px; }
@@ -210,6 +220,49 @@
     background:var(--ok-bg); border-radius:12px; padding:12px 14px; }
   .learn-box{ text-align:left; margin:18px 0 4px; padding-top:16px; border-top:1px solid var(--line); }
 
+  /* 星評価 */
+  #endStars{ margin:6px 0 10px; text-align:center; }
+  .goal-line{ font-size:13px; color:var(--muted); margin-bottom:6px; }
+  .stars{ font-size:40px; letter-spacing:6px; line-height:1; }
+  .stars .star{ color:#e0e0e0; }
+  .stars .star.on{ color:#f5b400; }
+  .star-label{ font-size:15px; font-weight:700; color:var(--ink); margin-top:8px; }
+
+  /* ふりかえり */
+  #endReflect{ text-align:left; background:var(--ok-bg); border-radius:14px; padding:14px 16px; margin:14px 0; }
+  .reflect-title{ font-size:14px; font-weight:700; color:var(--green-d); margin-bottom:8px; }
+  .reflect-line{ font-size:14px; line-height:1.7; color:var(--ink); margin-bottom:4px; }
+
+  /* 貯金チャレンジのコース */
+  .course{
+    width:100%; border:2px solid var(--line); background:#fff; border-radius:14px;
+    padding:16px; margin-bottom:12px; cursor:pointer; font-family:inherit; text-align:left;
+    display:flex; align-items:center; gap:14px; transition:all .12s;
+  }
+  .course:active{ transform:scale(0.99); }
+  .course .cic{ font-size:30px; line-height:1; flex:0 0 auto; }
+  .course .ctx{ flex:1; }
+  .course .cname{ font-size:18px; font-weight:700; color:var(--ink); display:block; }
+  .course .csub{ font-size:13px; color:var(--muted); }
+  .course.hi{ border-color:#f0c987; }
+  .course.mid{ border-color:#c2e3cb; }
+  .course.lo{ border-color:#c2d4e8; }
+
+  /* マイナス警告ダイアログ */
+  .warnmask{
+    position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:80;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .warnbox{
+    background:#fff; border-radius:18px; padding:24px 20px; max-width:340px; width:100%;
+    box-shadow:0 12px 40px rgba(0,0,0,.25); text-align:center;
+  }
+  .warnbox .wh{ font-size:20px; font-weight:700; color:var(--red); margin:0 0 8px; }
+  .warnbox .wb{ font-size:15px; line-height:1.7; color:var(--ink); margin:0 0 18px; }
+  .warnbox .wrow{ display:flex; gap:10px; }
+  .warnbox .wrow .btn{ flex:1; margin:0; }
+  .btn-cancel{ background:#fff; border:2px solid var(--line); color:var(--muted); }
+
   /* 固定費バー（常時表示） */
   .fixedbar{ display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px; }
   .fixedbar .fc{
@@ -255,8 +308,17 @@
       <p class="learn-p">ぜんぶ つかいきっても いいけれど、もしもの ときの ために、お<ruby>金<rt>かね</rt></ruby>を のこしておくのも <ruby>大切<rt>たいせつ</rt></ruby>です。</p>
       <p class="learn-p">「いまの のこりは いくら？」「このあと まだ <ruby>払<rt>はら</rt></ruby>うものは ある？」 そう かんがえながら つかうのが、じょうずな お<ruby>金<rt>かね</rt></ruby>の つかいかたです。</p>
       <div class="btn-row">
-        <button class="btn btn-primary" onclick="GAME.goPlan()">わかった！ ゲームへ</button>
+        <button class="btn btn-primary" onclick="GAME.goChallenge()">わかった！ つぎへ</button>
       </div>
+    </div>
+  </section>
+
+  <!-- 貯金チャレンジ（目標えらび） -->
+  <section class="screen" id="s-challenge">
+    <h1>こんげつの <ruby>目標<rt>もくひょう</rt></ruby>を きめよう</h1>
+    <p class="lead">お<ruby>金<rt>かね</rt></ruby>を どれくらい のこすか きめて チャレンジ！</p>
+    <div class="panel">
+      <div id="courseList"></div>
     </div>
   </section>
 
@@ -296,8 +358,10 @@
       </div>
       <img id="endChar" class="endchar" src="" alt="">
       <div class="big" id="endBig">—</div>
+      <div id="endStars"></div>
       <div class="endhead" id="endHead"></div>
       <div class="endbody" id="endBody"></div>
+      <div id="endReflect"></div>
       <div class="endcommon" id="endCommon"></div>
       <div class="learn-box">
         <p class="learn-p">このゲームは、くらしの ほんの <ruby>一部<rt>いちぶ</rt></ruby>を <ruby>切<rt>き</rt></ruby>りとった ものです。ほんとうの <ruby>生活<rt>せいかつ</rt></ruby>には、もっと いろんなことが あります。</p>
