@@ -30,8 +30,8 @@ const GAME = {
     this.flags = {};
     this.diff = CONFIG.DIFFICULTY_SETS[CONFIG.DIFFICULTY] || CONFIG.DIFFICULTY_SETS.easy;
     document.getElementById('sumSalary').textContent = yen(this.salary);
-    this.buildPlan();
-    this.show('plan');
+    if(where==='learn'){ this.show('learn'); }
+    else { this.buildPlan(); this.show('plan'); }
   },
 
   goPlan(){ this.buildPlan(); this.show('plan'); },
@@ -183,7 +183,28 @@ const GAME = {
       const pos = lo2 + Math.floor(Math.random()*Math.max(1,(hi2-lo2)));
       deck.splice(Math.min(pos, deck.length), 0, pays[s]);
     }
+    this.ensureShikakuOrder(deck);
     return deck;
+  },
+
+  /* 資格の順序保証：ランクアップ（資格が必要）が出るなら、その前に必ず資格カードを出す */
+  ensureShikakuOrder(deck){
+    const rankIdx = deck.findIndex(c => c.requireFlag === 'shikaku');
+    if(rankIdx < 0) return; // ランクアップが無ければ何もしない
+    let shikakuIdx = deck.findIndex(c =>
+      c.type==='green' && c.options && c.options.some(o=>o.setsFlag==='shikaku'));
+    if(shikakuIdx < 0){
+      // デッキに資格カードが無い → 元データから入れて、ランクアップの前に置く
+      const src = CONFIG.CARDS.find(c =>
+        c.type==='green' && c.options && c.options.some(o=>o.setsFlag==='shikaku'));
+      if(src){ deck.splice(rankIdx, 0, src); }
+      return;
+    }
+    if(shikakuIdx > rankIdx){
+      // 資格がランクアップより後ろ → 資格を抜いて、ランクアップの直前に差し込む
+      const card = deck.splice(shikakuIdx, 1)[0];
+      deck.splice(rankIdx, 0, card);
+    }
   },
 
   /* カードの最大コスト（高額判定用） */
@@ -251,14 +272,16 @@ const GAME = {
         + '<span>'+o.text+'</span></span>'
         + '<span class="amt">'+o.cost.toLocaleString('ja-JP')+'えん</span>';
       b.onclick = () => {
-        body.querySelectorAll('.choice').forEach(x=>x.disabled=true);
+        // 選ばなかった選択肢は薄くし、選んだものだけ目立たせる
+        body.querySelectorAll('.choice').forEach(x=>{ x.disabled=true; x.classList.add('faded'); });
+        b.classList.remove('faded');
         b.classList.add('picked');
-        // 宝くじ：買うと当たりで5,000円
         let extraMsg = '';
         if(o.lottery){
           this.pay(o.cost);
-          const win = Math.random() < 0.5;
-          if(win){ this.gain(5000); extraMsg = 'じゃんけんに 勝って 5,000えん もらえた！'; }
+          // 宝くじ：実際の宝くじのように めったに当たらない。当たれば 50,000円
+          const win = Math.random() < 0.01;
+          if(win){ this.gain(50000); extraMsg = 'なんと 大当たり！50,000えん もらえた！'; }
           else { extraMsg = 'ざんねん、はずれ…'; }
         } else {
           this.pay(o.cost);
@@ -268,7 +291,7 @@ const GAME = {
         const base = o.cost>0 ? (o.text+'を えらんで '+o.cost.toLocaleString('ja-JP')+'えん 払ったよ') : (o.text+'を えらんだよ（0えん）');
         // 緑カードは「自分で選ぶ買い物」。演出は出さない。
         // ただし宝くじに当たってお金が増えたときだけ、うれしい顔。
-        const fx = (o.lottery && extraMsg.indexOf('もらえた')>=0) ? 'plus' : null;
+        const fx = (o.lottery && extraMsg.indexOf('もらえた')>=0) ? 'excited' : null;
         this.afterAction(body, extraMsg ? base+'／'+extraMsg : base, fx);
       };
       body.appendChild(b);
@@ -288,7 +311,7 @@ const GAME = {
     b.className='btn btn-primary'; b.style.marginTop='12px';
     b.textContent = opt.cost.toLocaleString('ja-JP')+'えん 払う';
     b.onclick = () => {
-      b.disabled=true;
+      b.remove();
       this.pay(opt.cost);
       this.markFixedPaid(card.expenseKey);
       this.afterAction(body, '毎月の 固定費を 払ったよ', null);
@@ -310,7 +333,7 @@ const GAME = {
     b.className='btn btn-primary';
     b.textContent='🎁 くじを 引く';
     b.onclick = () => {
-      b.disabled=true;
+      b.remove();
       const win = Math.random() < rate;
       const amt = win ? card.win : card.lose;
       if(win && amt) this.gain(amt);
@@ -353,7 +376,7 @@ const GAME = {
     const b = document.createElement('button');
     b.className='btn btn-primary'; b.style.marginTop='12px';
     b.textContent='もらう';
-    b.onclick = () => { b.disabled=true; this.gain(card.gain); this.afterAction(body, '', 'plus'); };
+    b.onclick = () => { b.remove(); this.gain(card.gain); this.afterAction(body, '', 'plus'); };
     body.appendChild(b);
   },
 
@@ -377,7 +400,7 @@ const GAME = {
     const b = document.createElement('button');
     b.className='btn btn-primary'; b.style.marginTop='12px';
     b.textContent = card.cost.toLocaleString('ja-JP')+'えん 払う';
-    b.onclick = () => { b.disabled=true; this.pay(card.cost); this.afterAction(body, '', this.fxForPay(card.cost)); };
+    b.onclick = () => { b.remove(); this.pay(card.cost); this.afterAction(body, '', this.fxForPay(card.cost)); };
     body.appendChild(b);
   },
 
