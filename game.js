@@ -188,6 +188,21 @@ const GAME = {
 
     let chosen = shuffle(chosenLucky.concat(hiPick).concat(loPick));
 
+    // よく出したいカード（宝くじ・資格など）を、指定の確率で必ず入れる
+    (CONFIG.FEATURED_CARDS || []).forEach(f => {
+      const already = chosen.some(c => c.title === f.title);
+      if(already) return;                       // すでに入っていれば何もしない
+      if(Math.random() >= f.rate) return;       // 確率で出さない回もある
+      const src = CONFIG.CARDS.find(c => c.title === f.title);
+      if(!src) return;
+      // ふつうカードを1枚 押し出して、代わりに入れる（枚数を保つ）
+      const loIdx = chosen.findIndex(c => (c.type==='green'||c.type==='red') && this.cardMaxCost(c) < 20000
+                      && !(CONFIG.FEATURED_CARDS || []).some(ff=>ff.title===c.title));
+      if(loIdx >= 0){ chosen.splice(loIdx, 1, src); }
+      else { chosen.push(src); }
+    });
+    chosen = shuffle(chosen);
+
     // 支払日カードを必ず入れて、全体にばらけさせる
     const pays = shuffle(CONFIG.PAYDAY_CARDS.slice());
     if(!CONFIG.SPREAD_PAYDAY){
