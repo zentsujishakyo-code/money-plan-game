@@ -114,8 +114,9 @@
   .choice.B .badge{ background:var(--green); }
   .choice.C .badge{ background:var(--blue); }
   .choice:active{ transform:scale(0.99); }
-  .choice.picked{ border-color:var(--green); background:var(--ok-bg); }
-  .choice:disabled{ opacity:.5; cursor:default; }
+  .choice.picked{ border-color:var(--green); background:var(--ok-bg); opacity:1; }
+  .choice:disabled{ cursor:default; }
+  .choice.faded{ opacity:.4; }
 
   .bigbox{ border-radius:12px; padding:18px; text-align:center; margin-bottom:4px; }
   .bigbox .k{ font-size:14px; margin-bottom:6px; }
@@ -203,6 +204,12 @@
   /* タイトル画像 */
   .titleimg{ display:block; width:100%; max-width:380px; height:auto; margin:0 auto 4px; border-radius:14px; }
 
+  /* お金の説明テキスト */
+  .learn-p{ font-size:16px; line-height:1.9; color:var(--ink); margin:0 0 14px; text-align:left; }
+  .learn-note{ font-size:14px; line-height:1.85; color:var(--muted); margin:0 0 14px; text-align:left;
+    background:var(--ok-bg); border-radius:12px; padding:12px 14px; }
+  .learn-box{ text-align:left; margin:18px 0 4px; padding-top:16px; border-top:1px solid var(--line); }
+
   /* 固定費バー（常時表示） */
   .fixedbar{ display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px; }
   .fixedbar .fc{
@@ -235,7 +242,20 @@
         <button class="diffbtn" id="diff-normal" onclick="GAME.setDiff('normal')">ふつう</button>
       </div>
       <div class="btn-row">
-        <button class="btn btn-primary" onclick="GAME.start('plan')">ゲームを はじめる</button>
+        <button class="btn btn-primary" onclick="GAME.start('learn')">ゲームを はじめる</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- お金の説明（プラン選択の前） -->
+  <section class="screen" id="s-learn">
+    <h1>お<ruby>金<rt>かね</rt></ruby>の つかいかたを かんがえよう</h1>
+    <div class="panel">
+      <p class="learn-p">まいつき もらえる お<ruby>給料<rt>きゅうりょう</rt></ruby>は きまっています。その<ruby>中<rt>なか</rt></ruby>から、ごはん・<ruby>家<rt>いえ</rt></ruby>・<ruby>電気<rt>でんき</rt></ruby>などの「ぜったい かかる お<ruby>金<rt>かね</rt></ruby>（<ruby>固定費<rt>こていひ</rt></ruby>）」を <ruby>払<rt>はら</rt></ruby>います。のこった お<ruby>金<rt>かね</rt></ruby>で、ほしいものを <ruby>買<rt>か</rt></ruby>ったり、あそびに <ruby>行<rt>い</rt></ruby>ったりします。</p>
+      <p class="learn-p">ぜんぶ つかいきっても いいけれど、もしもの ときの ために、お<ruby>金<rt>かね</rt></ruby>を のこしておくのも <ruby>大切<rt>たいせつ</rt></ruby>です。</p>
+      <p class="learn-p">「いまの のこりは いくら？」「このあと まだ <ruby>払<rt>はら</rt></ruby>うものは ある？」 そう かんがえながら つかうのが、じょうずな お<ruby>金<rt>かね</rt></ruby>の つかいかたです。</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="GAME.goPlan()">わかった！ ゲームへ</button>
       </div>
     </div>
   </section>
@@ -279,6 +299,12 @@
       <div class="endhead" id="endHead"></div>
       <div class="endbody" id="endBody"></div>
       <div class="endcommon" id="endCommon"></div>
+      <div class="learn-box">
+        <p class="learn-p">このゲームは、くらしの ほんの <ruby>一部<rt>いちぶ</rt></ruby>を <ruby>切<rt>き</rt></ruby>りとった ものです。ほんとうの <ruby>生活<rt>せいかつ</rt></ruby>には、もっと いろんなことが あります。</p>
+        <p class="learn-p">お<ruby>金<rt>かね</rt></ruby>は「つかう」だけでなく、もしもの ときの ために そなえたり、<ruby>将来<rt>しょうらい</rt></ruby>の ために ためたり、ふやしたり することも できます。</p>
+        <p class="learn-note">（ためた お<ruby>金<rt>かね</rt></ruby>を はたらかせて ふやすことを「<ruby>投資<rt>とうし</rt></ruby>」と いいます。うまく いくと ふえますが、へることも あるので、よく かんがえて おこないます。）</p>
+        <p class="learn-p">お<ruby>金<rt>かね</rt></ruby>のことを <ruby>考<rt>かんが</rt></ruby>えながら くらすことは、<ruby>自分<rt>じぶん</rt></ruby>や <ruby>家族<rt>かぞく</rt></ruby>の しあわせを まもることに つながります。</p>
+      </div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="GAME.restart()">もう いちど あそぶ</button>
       </div>
