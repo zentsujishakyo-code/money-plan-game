@@ -16,8 +16,8 @@
    ★カードの連動★
    - requireFlag:"shikaku"      … 資格を持っている人だけ有効
    - requireExpense:{key,label} … ワークシート1で特定プランを選んだ人だけ
-   - setsFlag:"shikaku"/"hoken" … このカードで資格・保険を得る
-   - onlyIfFlag:"hoken"         … その選択肢は条件を満たす人だけ
+   - setsFlag:"shikaku"         … このカードで資格を得る
+   - onlyIfFlag:"xxx"           … その選択肢は条件を満たす人だけ
    ============================================================ */
 
 const CONFIG = {
@@ -138,14 +138,11 @@ const CONFIG = {
 
     { type:"green", title:"資格", subtitle:"勉強すれば将来役に立つかも？", icon:"up",
       options:[ {label:"A",text:"勉強する（資格がとれる）",cost:5000,setsFlag:"shikaku"},{label:"B",text:"今は勉強しない",cost:0} ] },
-    { type:"green", title:"医りょう保険", subtitle:"けがや病気が心配…", icon:"heart",
-      options:[ {label:"A",text:"保険に入って備える（1か月分）",cost:5000,setsFlag:"hoken"},{label:"B",text:"入らない",cost:0} ] },
     { type:"green", title:"パソコン", subtitle:"新しいパソコンが発売された", icon:"phone",
       options:[ {label:"A",text:"一括で買う",cost:50000},{label:"B",text:"ローンで買う（今回12,000円・総額60,000円）",cost:12000,note:"ローンは総額が高くなるよ"},{label:"C",text:"買わない",cost:0} ] },
     { type:"green", title:"車（高額）", subtitle:"前から欲しかった車（150万円）！", icon:"bus",
       options:[ {label:"A",text:"銀行ローンで買う（今回30,000円・約4年）",cost:30000,note:"長いあいだ払い続けるよ"},{label:"B",text:"買わない",cost:0} ] },
-    { type:"green", title:"入院", subtitle:"転んで大けが！入院が必要に", icon:"heart",
-      options:[ {label:"A",text:"入院費を払う",cost:30000},{label:"B",text:"保険金で支払う（保険に入っている人）",cost:0,onlyIfFlag:"hoken"} ] },
+    { type:"red", title:"入院", subtitle:"転んで大けが！入院が必要に", icon:"heart", cost:30000, costLabel:"入院費" },
 
     { type:"yellow", title:"就職祝い", subtitle:"祖父母から就職祝いをいただいた！", icon:"gift", gain:20000, gainLabel:"お祝い" },
     { type:"yellow", title:"落とし物のお礼", subtitle:"落とし物を届けたらお礼が", icon:"gift", gain:10000, gainLabel:"お礼" },
