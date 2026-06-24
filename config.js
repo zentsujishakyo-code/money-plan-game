@@ -33,32 +33,39 @@ const CONFIG = {
     normal: { drawCount: 15, luckyBoost: 1, fukubikiWin: 0.45, hiCap: 2 }
   },
 
+  /* 貯金チャレンジのコース（目標として残したい金額） */
+  SAVING_COURSES: [
+    { key:"hi",  label:"たくさん のこす",     ruby:"たくさん のこす",     goal:20000, sub:"20,000えん いじょう" },
+    { key:"mid", label:"そこそこ のこす",     ruby:"そこそこ のこす",     goal:10000, sub:"10,000えん いじょう" },
+    { key:"lo",  label:"まずは 赤字に しない", ruby:"まずは <ruby>赤字<rt>あかじ</rt></ruby>に しない", goal:0, sub:"0えん いじょう" }
+  ],
+
   EXPENSES: [
-    { key:"food", name:"食事", ruby:"しょくじ",
+    { key:"food", name:"食事", ruby:"しょくじ", icon:"food",
       options:[
         { label:"A", text:"すべて外食", textRuby:"すべて<ruby>外食<rt>がいしょく</rt></ruby>", cost:50000 },
         { label:"B", text:"たまに外食", textRuby:"たまに<ruby>外食<rt>がいしょく</rt></ruby>", cost:30000 },
         { label:"C", text:"すべて自炊", textRuby:"すべて<ruby>自炊<rt>じすい</rt></ruby>", cost:20000 }
       ] },
-    { key:"home", name:"家", ruby:"いえ",
+    { key:"home", name:"家", ruby:"いえ", icon:"home",
       options:[
         { label:"A", text:"新築・便利", textRuby:"<ruby>新築<rt>しんちく</rt></ruby>・<ruby>便利<rt>べんり</rt></ruby>", cost:60000 },
         { label:"B", text:"築10年・自転車", textRuby:"<ruby>築<rt>ちく</rt></ruby>10<ruby>年<rt>ねん</rt></ruby>・<ruby>自転車<rt>じてんしゃ</rt></ruby>", cost:40000 },
         { label:"C", text:"古い・店が遠い", textRuby:"<ruby>古<rt>ふる</rt></ruby>い・<ruby>店<rt>みせ</rt></ruby>が<ruby>遠<rt>とお</rt></ruby>い", cost:30000 }
       ] },
-    { key:"util", name:"電気ガス水道", ruby:"でんき・ガス・すいどう",
+    { key:"util", name:"電気ガス水道", ruby:"でんき・ガス・すいどう", icon:"bulb",
       options:[
         { label:"A", text:"気にせず使う", textRuby:"<ruby>気<rt>き</rt></ruby>にせず<ruby>使<rt>つか</rt></ruby>う", cost:15000 },
         { label:"B", text:"ふつうに使う", textRuby:"ふつうに<ruby>使<rt>つか</rt></ruby>う", cost:11000 },
         { label:"C", text:"節約する", textRuby:"<ruby>節約<rt>せつやく</rt></ruby>する", cost:7000 }
       ] },
-    { key:"phone", name:"スマホ", ruby:"",
+    { key:"phone", name:"スマホ", ruby:"", icon:"phone",
       options:[
         { label:"A", text:"無制限", textRuby:"<ruby>無制限<rt>むせいげん</rt></ruby>", cost:10000 },
         { label:"B", text:"20ギガ", textRuby:"20ギガ", cost:3000 },
         { label:"C", text:"格安3ギガ", textRuby:"<ruby>格安<rt>かくやす</rt></ruby>3ギガ", cost:1000 }
       ] },
-    { key:"move", name:"移動", ruby:"いどう",
+    { key:"move", name:"移動", ruby:"いどう", icon:"bus",
       options:[
         { label:"A", text:"自分の車", textRuby:"<ruby>自分<rt>じぶん</rt></ruby>の<ruby>車<rt>くるま</rt></ruby>", cost:10000 },
         { label:"B", text:"公共交通", textRuby:"<ruby>公共<rt>こうきょう</rt></ruby><ruby>交通<rt>こうつう</rt></ruby>", cost:5000 },
