@@ -33,6 +33,13 @@ const CONFIG = {
     normal: { drawCount: 15, luckyBoost: 1, fukubikiWin: 0.45, hiCap: 2 }
   },
 
+  /* よく出したいカード（タイトルと出現確率）。
+     ふつうのカードに埋もれないよう、指定の確率でデッキに必ず入れる。 */
+  FEATURED_CARDS: [
+    { title:"宝くじ", rate:0.67 },
+    { title:"資格",   rate:0.67 }
+  ],
+
   /* 宝くじの設定（あとで調整しやすいように ここにまとめる） */
   LOTTERY: {
     cost: 3000,            // 購入金額
