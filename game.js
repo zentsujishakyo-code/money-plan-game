@@ -28,6 +28,7 @@ const GAME = {
     this.salary = CONFIG.SALARY;
     this.selections = {};
     this.flags = {};
+    this.savingCourse = null;
     this.diff = CONFIG.DIFFICULTY_SETS[CONFIG.DIFFICULTY] || CONFIG.DIFFICULTY_SETS.easy;
     document.getElementById('sumSalary').textContent = yen(this.salary);
     if(where==='learn'){ this.show('learn'); }
@@ -35,6 +36,23 @@ const GAME = {
   },
 
   goPlan(){ this.buildPlan(); this.show('plan'); },
+
+  /* 貯金チャレンジ画面へ */
+  goChallenge(){
+    const host = document.getElementById('courseList');
+    host.innerHTML = '';
+    const icons = { hi:'🐷', mid:'💰', lo:'🛟' };
+    CONFIG.SAVING_COURSES.forEach(c => {
+      const b = document.createElement('button');
+      b.className = 'course '+c.key;
+      b.innerHTML = '<span class="cic">'+(icons[c.key]||'💰')+'</span>'
+        + '<span class="ctx"><span class="cname">'+(c.ruby||c.label)+'</span>'
+        + '<span class="csub">'+c.sub+'</span></span>';
+      b.onclick = () => { this.savingCourse = c; this.buildPlan(); this.show('plan'); };
+      host.appendChild(b);
+    });
+    this.show('challenge');
+  },
 
   setDiff(key){
     CONFIG.DIFFICULTY = key;
@@ -52,12 +70,13 @@ const GAME = {
       const box = document.createElement('div');
       box.className = 'exp';
       const name = exp.ruby ? rubyWrap(exp.name, exp.ruby) : exp.name;
-      box.innerHTML = '<h3>'+name+'</h3>';
+      const ic = ICONS[exp.icon] || '';
+      box.innerHTML = '<h3><span class="exp-ic">'+ic+'</span>'+name+'</h3>';
       const grid = document.createElement('div');
       grid.className = 'opts';
       exp.options.forEach((o,i) => {
         const b = document.createElement('button');
-        b.className = 'opt';
+        b.className = 'opt opt-'+o.label;   // opt-A / opt-B / opt-C で色分け
         b.innerHTML = '<span class="tag">'+o.label+'</span>'
           + '<span class="nm">'+(o.textRuby||o.text)+'</span>'
           + '<span class="pr">'+o.cost.toLocaleString('ja-JP')+'</span>';
@@ -183,28 +202,28 @@ const GAME = {
       const pos = lo2 + Math.floor(Math.random()*Math.max(1,(hi2-lo2)));
       deck.splice(Math.min(pos, deck.length), 0, pays[s]);
     }
-    this.ensureShikakuOrder(deck);
+    // ランクアップ（資格でもらえるカード）は最初はデッキから除外。
+    // 資格を取ったときに、あとから動的に差し込む。
+    this.rankCard = null;
+    for(let k=deck.length-1; k>=0; k--){
+      if(deck[k].requireFlag === 'shikaku'){
+        this.rankCard = deck.splice(k,1)[0];
+      }
+    }
     return deck;
   },
 
-  /* 資格の順序保証：ランクアップ（資格が必要）が出るなら、その前に必ず資格カードを出す */
-  ensureShikakuOrder(deck){
-    const rankIdx = deck.findIndex(c => c.requireFlag === 'shikaku');
-    if(rankIdx < 0) return; // ランクアップが無ければ何もしない
-    let shikakuIdx = deck.findIndex(c =>
-      c.type==='green' && c.options && c.options.some(o=>o.setsFlag==='shikaku'));
-    if(shikakuIdx < 0){
-      // デッキに資格カードが無い → 元データから入れて、ランクアップの前に置く
-      const src = CONFIG.CARDS.find(c =>
-        c.type==='green' && c.options && c.options.some(o=>o.setsFlag==='shikaku'));
-      if(src){ deck.splice(rankIdx, 0, src); }
-      return;
-    }
-    if(shikakuIdx > rankIdx){
-      // 資格がランクアップより後ろ → 資格を抜いて、ランクアップの直前に差し込む
-      const card = deck.splice(shikakuIdx, 1)[0];
-      deck.splice(rankIdx, 0, card);
-    }
+  /* 資格を取ったとき：50%でランクアップを「3枚以上あと」に差し込む */
+  tryScheduleRankup(){
+    if(!this.rankCard) return;            // ランクアップ自体が無い回
+    if(Math.random() >= 0.5) return;      // 半々で出ない
+    const earliest = this.idx + 4;        // 今のカードから3枚以上あと（=4枚目以降）
+    if(earliest > this.deck.length) return; // もう入れる余地がなければ出さない
+    const span = this.deck.length - earliest;
+    const pos = earliest + (span>0 ? Math.floor(Math.random()*(span+1)) : 0);
+    this.deck.splice(Math.min(pos, this.deck.length), 0, this.rankCard);
+    this.rankCard = null;                 // 一度だけ
+    this.refreshHud();                    // のこり枚数表示を更新
   },
 
   /* カードの最大コスト（高額判定用） */
@@ -272,30 +291,62 @@ const GAME = {
         + '<span>'+o.text+'</span></span>'
         + '<span class="amt">'+o.cost.toLocaleString('ja-JP')+'えん</span>';
       b.onclick = () => {
-        // 選ばなかった選択肢は薄くし、選んだものだけ目立たせる
-        body.querySelectorAll('.choice').forEach(x=>{ x.disabled=true; x.classList.add('faded'); });
-        b.classList.remove('faded');
-        b.classList.add('picked');
-        let extraMsg = '';
-        if(o.lottery){
-          this.pay(o.cost);
-          // 宝くじ：実際の宝くじのように めったに当たらない。当たれば 50,000円
-          const win = Math.random() < 0.01;
-          if(win){ this.gain(50000); extraMsg = 'なんと 大当たり！50,000えん もらえた！'; }
-          else { extraMsg = 'ざんねん、はずれ…'; }
+        // お金を払うと残高がマイナスになる場合は、緑カードだけ警告を出す
+        const willGoNegative = (o.cost > 0) && ((this.balance - o.cost) < 0);
+        if(willGoNegative){
+          this.confirmMinus(o.cost, () => this.applyGreenChoice(card, o, b, body));
         } else {
-          this.pay(o.cost);
+          this.applyGreenChoice(card, o, b, body);
         }
-        if(o.setsFlag){ this.flags[o.setsFlag] = true; }
-        if(o.note){ extraMsg = (extraMsg?extraMsg+' ':'') + o.note; }
-        const base = o.cost>0 ? (o.text+'を えらんで '+o.cost.toLocaleString('ja-JP')+'えん 払ったよ') : (o.text+'を えらんだよ（0えん）');
-        // 緑カードは「自分で選ぶ買い物」。演出は出さない。
-        // ただし宝くじに当たってお金が増えたときだけ、うれしい顔。
-        const fx = (o.lottery && extraMsg.indexOf('もらえた')>=0) ? 'excited' : null;
-        this.afterAction(body, extraMsg ? base+'／'+extraMsg : base, fx);
       };
       body.appendChild(b);
     });
+  },
+
+  /* 緑カードの選択を実行する */
+  applyGreenChoice(card, o, b, body){
+    // 選ばなかった選択肢は薄くし、選んだものだけ目立たせる
+    body.querySelectorAll('.choice').forEach(x=>{ x.disabled=true; x.classList.add('faded'); });
+    b.classList.remove('faded');
+    b.classList.add('picked');
+    let extraMsg = '';
+    if(o.lottery){
+      this.pay(o.cost);
+      // 宝くじ：実際の宝くじのように めったに当たらない。当たれば 50,000円
+      const win = Math.random() < 0.01;
+      if(win){ this.gain(50000); extraMsg = 'なんと 大当たり！50,000えん もらえた！'; }
+      else { extraMsg = 'ざんねん、はずれ…'; }
+    } else {
+      this.pay(o.cost);
+    }
+    if(o.setsFlag){
+      this.flags[o.setsFlag] = true;
+      if(o.setsFlag==='shikaku'){ this.tryScheduleRankup(); }
+    }
+    if(o.note){ extraMsg = (extraMsg?extraMsg+' ':'') + o.note; }
+    const base = o.cost>0 ? (o.text+'を えらんで '+o.cost.toLocaleString('ja-JP')+'えん 払ったよ') : (o.text+'を えらんだよ（0えん）');
+    // 緑カードは「自分で選ぶ買い物」。演出は出さない。
+    // ただし宝くじに当たってお金が増えたときだけ、うれしい顔。
+    const fx = (o.lottery && extraMsg.indexOf('もらえた')>=0) ? 'excited' : null;
+    this.afterAction(body, extraMsg ? base+'／'+extraMsg : base, fx);
+  },
+
+  /* マイナスになる買い物の確認ダイアログ */
+  confirmMinus(cost, onOk){
+    const after = this.balance - cost;
+    const mask = document.createElement('div');
+    mask.className = 'warnmask';
+    mask.innerHTML =
+      '<div class="warnbox">'
+      + '<div class="wh">お金が たりないよ</div>'
+      + '<div class="wb">これを 買うと、のこりが <b>'+yen(after)+'</b> に なります。<br>お金が ないのに 買うと、あとで こまるかも。<br>それでも 買いますか？</div>'
+      + '<div class="wrow">'
+      + '<button class="btn btn-cancel" id="warnNo">やめておく</button>'
+      + '<button class="btn btn-primary" id="warnYes">それでも 買う</button>'
+      + '</div></div>';
+    document.body.appendChild(mask);
+    mask.querySelector('#warnNo').onclick = () => mask.remove();
+    mask.querySelector('#warnYes').onclick = () => { mask.remove(); onOk(); };
   },
 
   renderPay(card, body){
@@ -500,10 +551,60 @@ const GAME = {
       endChar.src = plus ? 'char-clear.png' : (bigMinus ? 'char-sad.png' : 'char-encourage.png');
       endChar.alt = '';
     }
+    this.renderStars();
+    this.renderReflection();
     this.show('end');
   },
 
-  restart(){ this.selections={}; this.flags={}; this.balance=0; this.idx=0; this.show('menu'); }
+  /* 貯金チャレンジの達成を 星で表す */
+  renderStars(){
+    const host = document.getElementById('endStars');
+    if(!host) return;
+    const course = this.savingCourse;
+    const goal = course ? course.goal : 0;
+    let stars, label;
+    if(this.balance >= 0 && (course ? this.balance >= goal : true)){
+      stars = 3; label = course ? '目標 たっせい！すばらしい！' : 'よく のこせたね！';
+    } else if(this.balance >= 0){
+      stars = 2; label = '赤字には ならなかったね。目標まで あと すこし！';
+    } else {
+      stars = 1; label = 'つぎは 赤字に ならないように チャレンジ！';
+    }
+    let s = '';
+    for(let i=0;i<3;i++){ s += '<span class="star '+(i<stars?'on':'')+'">★</span>'; }
+    let goalLine = '';
+    if(course){
+      goalLine = '<div class="goal-line">こんげつの 目標：'+course.label+'（'+course.sub+'）</div>';
+    }
+    host.innerHTML = goalLine + '<div class="stars">'+s+'</div><div class="star-label">'+label+'</div>';
+  },
+
+  /* プレイ内容に応じた ふりかえりの一言 */
+  renderReflection(){
+    const host = document.getElementById('endReflect');
+    if(!host) return;
+    const msgs = [];
+    // プランの選択から
+    if(this.expenseLabel('food')==='C') msgs.push('じすいを えらんで、食費を かしこく おさえたね。');
+    if(this.expenseLabel('util')==='C') msgs.push('電気・ガス・水道を 節約できたね。');
+    if(this.expenseLabel('phone')==='C') msgs.push('スマホを 格安プランにして かしこい！');
+    if(this.flags.shikaku) msgs.push('資格の 勉強を がんばったね。学びは 将来の ちからに なるよ。');
+    // 残高から
+    if(this.balance < 0){
+      msgs.push('お金が たりなくなる 場面も あったね。つぎは 先を 考えて つかってみよう。');
+    } else if(this.balance >= 20000){
+      msgs.push('しっかり お金を のこせたね。がまんする ちからが あるね。');
+    }
+    if(msgs.length===0){
+      msgs.push('いろんな えらびかたを ためせたね。つぎは どうするか 考えてみよう。');
+    }
+    // 最大3つまで
+    const pick = msgs.slice(0,3);
+    host.innerHTML = '<div class="reflect-title">ふりかえり</div>'
+      + pick.map(t=>'<div class="reflect-line">・'+t+'</div>').join('');
+  },
+
+  restart(){ this.selections={}; this.flags={}; this.balance=0; this.idx=0; this.savingCourse=null; this.rankCard=null; this.show('menu'); }
 };
 
 function yen(n){ return n.toLocaleString('ja-JP') + 'えん'; }
