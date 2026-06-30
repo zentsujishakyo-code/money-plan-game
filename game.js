@@ -18,6 +18,12 @@ const GAME = {
   idx: 0,
   diff: null,
 
+  // ---- 複数人モード用 ----
+  multi: false,       // みんなで遊ぶモードか
+  players: [],        // [{name, selections, savingCourse, balance, flags, paidFixed, log:[]}]
+  turn: 0,            // いま入力している人（0始まり）
+  setupIdx: 0,        // 準備中：いま設定している人
+
   show(id){
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
     document.getElementById('s-'+id).classList.add('active');
@@ -36,6 +42,310 @@ const GAME = {
   },
 
   goPlan(){ this.buildPlan(); this.show('plan'); },
+
+  /* =================================================================
+     みんなで遊ぶモード（複数人・パスアンドプレイ）
+     ================================================================= */
+
+  /* 「みんなで遊ぶ」を選んだ：難易度を決める画面へ */
+  startMulti(){
+    this.multi = true;
+    this.players = [];
+    this.salary = CONFIG.SALARY;
+    document.getElementById('sumSalary').textContent = yen(this.salary);
+    this.show('mdiff');
+  },
+
+  /* 難易度を選んだ：人数を決める画面へ */
+  mSetDiff(key){
+    CONFIG.DIFFICULTY = key;
+    ['easy','normal'].forEach(k=>{
+      const b = document.getElementById('mdiff-'+k);
+      if(b) b.classList.toggle('on', k===key);
+    });
+  },
+  mGoCount(){
+    this.diff = CONFIG.DIFFICULTY_SETS[CONFIG.DIFFICULTY] || CONFIG.DIFFICULTY_SETS.easy;
+    this.show('mcount');
+  },
+
+  /* 人数を選んだ：各自の設定（名前→プラン→目標）へ */
+  mSetCount(n){
+    this.playerCount = n;
+    this.players = [];
+    for(let i=0;i<n;i++){
+      this.players.push({ name:'', selections:{}, savingCourse:null,
+        balance:0, flags:{}, paidFixed:{}, log:[] });
+    }
+    this.setupIdx = 0;
+    this.mSetupPlayer();
+  },
+
+  /* いまの人の「名前・プラン・目標」を入力する画面 */
+  mSetupPlayer(){
+    const i = this.setupIdx;
+    const total = this.playerCount;
+    document.getElementById('mSetupTitle').textContent =
+      (i+1)+'人目（ぜんいんで '+total+'人）の せってい';
+    // 名前欄をリセット
+    const nameInput = document.getElementById('mName');
+    nameInput.value = this.players[i].name || '';
+    // プラン（くらし）を作る
+    this.selections = {};   // 一時的に使う
+    this.buildMPlan();
+    // 目標コースを作る
+    this.buildMCourse();
+    this._setupChoice = null;
+    this.show('msetup');
+    this.mSetupValidate();
+  },
+
+  buildMPlan(){
+    const host = document.getElementById('mExpList');
+    host.innerHTML = '';
+    CONFIG.EXPENSES.forEach(exp => {
+      const box = document.createElement('div');
+      box.className = 'exp';
+      const name = exp.ruby ? rubyWrap(exp.name, exp.ruby) : exp.name;
+      const ic = ICONS[exp.icon] || '';
+      box.innerHTML = '<h3><span class="exp-ic">'+ic+'</span>'+name+'</h3>';
+      const grid = document.createElement('div');
+      grid.className = 'opts';
+      exp.options.forEach((o,idx) => {
+        const b = document.createElement('button');
+        b.className = 'opt opt-'+o.label;
+        b.innerHTML = '<span class="tag">'+o.label+'</span>'
+          + '<span class="nm">'+(o.textRuby||o.text)+'</span>'
+          + '<span class="pr">'+o.cost.toLocaleString('ja-JP')+'</span>';
+        b.onclick = () => {
+          this.selections[exp.key] = idx;
+          grid.querySelectorAll('.opt').forEach(x=>x.classList.remove('sel'));
+          b.classList.add('sel');
+          this.mSetupValidate();
+        };
+        grid.appendChild(b);
+      });
+      box.appendChild(grid);
+      host.appendChild(box);
+    });
+  },
+
+  buildMCourse(){
+    const host = document.getElementById('mCourseList');
+    host.innerHTML = '';
+    const icons = { hi:'🐷', mid:'💰', lo:'🛟' };
+    CONFIG.SAVING_COURSES.forEach(c => {
+      const b = document.createElement('button');
+      b.className = 'course '+c.key;
+      b.innerHTML = '<span class="cic">'+(icons[c.key]||'💰')+'</span>'
+        + '<span class="ctx"><span class="cname">'+(c.ruby||c.label)+'</span>'
+        + '<span class="csub">'+c.sub+'</span></span>';
+      b.onclick = () => {
+        this._setupChoice = c;
+        host.querySelectorAll('.course').forEach(x=>x.classList.remove('sel'));
+        b.classList.add('sel');
+        this.mSetupValidate();
+      };
+      host.appendChild(b);
+    });
+  },
+
+  /* 名前・プラン5つ・目標が そろったら「つぎへ」を出す */
+  mSetupValidate(){
+    const nameOk = document.getElementById('mName').value.trim().length>0;
+    const planOk = Object.keys(this.selections).length === CONFIG.EXPENSES.length;
+    const courseOk = !!this._setupChoice;
+    const btn = document.getElementById('mSetupNext');
+    btn.style.display = (nameOk && planOk && courseOk) ? 'block' : 'none';
+  },
+
+  /* いまの人の設定を保存して、次の人へ／全員終わったらゲーム開始 */
+  mSetupNext(){
+    const i = this.setupIdx;
+    const pl = this.players[i];
+    pl.name = document.getElementById('mName').value.trim();
+    pl.selections = Object.assign({}, this.selections);
+    pl.savingCourse = this._setupChoice;
+    pl.balance = this.salary - this.mPlanTotal(pl.selections);
+    if(i+1 < this.playerCount){
+      this.setupIdx = i+1;
+      this.mSetupPlayer();
+    } else {
+      this.mStartGame();
+    }
+  },
+
+  mPlanTotal(sel){
+    let t=0;
+    CONFIG.EXPENSES.forEach(exp=>{ const idx=sel[exp.key]; if(idx!==undefined) t+=exp.options[idx].cost; });
+    return t;
+  },
+
+  /* ---- 複数人ゲーム開始 ---- */
+  mStartGame(){
+    // 全員 共通のデッキを1つ作る（順番も共通）
+    this.selections = this.players[0].selections; // buildDeck内の参照用（高額判定等）
+    this.flags = {};
+    this.deck = this.buildDeck();
+    this.idx = 0;        // いま何枚目のカードか（全員共通で進む）
+    this.turn = 0;       // いまそのカードを引く人
+    this.players.forEach(pl => { pl.flags={}; pl.paidFixed={}; pl.rankCard=null; pl.log=[]; });
+    this.show('mgame');
+    this.mAnnounce();
+  },
+
+  /* 「○○さん、カードを引いてください」のお知らせ */
+  mAnnounce(){
+    // 全カード終了？
+    if(this.idx >= this.deck.length){ this.mEndScreen(); return; }
+    const pl = this.players[this.turn];
+    const stage = document.getElementById('mStage');
+    stage.innerHTML =
+      '<div class="announce">'
+      + '<div class="an-sub">'+(this.idx+1)+'まいめ / '+this.deck.length+'まい</div>'
+      + '<div class="an-name">'+this.escapeHtml(pl.name)+' さん</div>'
+      + '<div class="an-msg">カードを ひいてください</div>'
+      + '<button class="btn btn-primary" id="anBtn">カードを ひく</button>'
+      + '</div>';
+    this.mRefreshBoard();
+    document.getElementById('anBtn').onclick = () => this.mCardBack();
+  },
+
+  /* 裏向きカードを出して、タップでめくる */
+  mCardBack(){
+    const stage = document.getElementById('mStage');
+    const pl = this.players[this.turn];
+    stage.innerHTML =
+      '<div class="turn-label">'+this.escapeHtml(pl.name)+' さんの ばん</div>'
+      + '<div class="cardback" id="mBack"><span class="qm">？</span></div>'
+      + '<div class="progress">タップして めくろう</div>';
+    document.getElementById('mBack').onclick = () => this.mReveal();
+    this.mRefreshBoard();
+  },
+
+  /* カードをめくって、いまの人の選択を受け付ける */
+  mReveal(){
+    const card = this.deck[this.idx];
+    const pl = this.players[this.turn];
+    // 一人用の reveal を再利用するため、現在プレイヤーの状態を GAME 本体に橋渡しする
+    this._bindPlayer(pl);
+    const stage = document.getElementById('mStage');
+    stage.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'gamecard';
+    const headClass = (card.type==='yellow'||card.type==='fukubiki'||card.type==='lottery_result') ? 'gc-yellow'
+                    : (card.type==='red') ? 'gc-red' : 'gc-green';
+    const ic = ICONS[card.icon] || '💴';
+    wrap.innerHTML = '<div class="gc-head '+headClass+'">'
+      + '<div class="turn-mini">'+this.escapeHtml(pl.name)+' さん</div>'
+      + '<div class="ic">'+ic+'</div>'
+      + '<h2>'+card.title+'</h2>'
+      + (card.subtitle?'<div class="sub">'+card.subtitle+'</div>':'')
+      + '</div>';
+    const body = document.createElement('div');
+    body.className = 'gc-body';
+    wrap.appendChild(body);
+    stage.appendChild(wrap);
+    this.mRefreshBoard();
+
+    // 選択後に呼ばれる「次へ」を、複数人用に差し替える
+    this._afterHook = () => this.mAfterTurn();
+
+    if(card.type==='green') this.renderGreen(card, body);
+    else if(card.type==='pay') this.renderPay(card, body);
+    else if(card.type==='fukubiki') this.renderFukubiki(card, body);
+    else if(card.type==='yellow') this.renderYellow(card, body);
+    else if(card.type==='red') this.renderRed(card, body);
+    else if(card.type==='lottery_result') this.renderLotteryResult(card, body);
+  },
+
+  /* 現在プレイヤーの状態を GAME本体のプロパティに割り当て（一人用関数を流用するため） */
+  _bindPlayer(pl){
+    this.balance = pl.balance;
+    this.flags = pl.flags;
+    this.paidFixed = pl.paidFixed;
+    this.selections = pl.selections;
+    this.savingCourse = pl.savingCourse;
+    this.rankCard = pl.rankCard;
+    this._cur = pl;
+  },
+  /* GAME本体の状態を 現在プレイヤーに書き戻す */
+  _savePlayer(){
+    const pl = this._cur;
+    if(!pl) return;
+    pl.balance = this.balance;
+    pl.flags = this.flags;
+    pl.paidFixed = this.paidFixed;
+    pl.rankCard = this.rankCard;
+  },
+
+  /* いまの人の選択が終わったあと：次の人 or 次のカードへ */
+  mAfterTurn(){
+    this._savePlayer();
+    if(this.turn + 1 < this.playerCount){
+      this.turn++;
+      this.mAnnounce();      // 次の人へ（同じカード）
+    } else {
+      this.turn = 0;
+      this.idx++;
+      this.mAnnounce();      // 次のカードへ（最初の人から）
+    }
+  },
+
+  /* 下部に全員の残高・選択をオープン表示 */
+  mRefreshBoard(){
+    const board = document.getElementById('mBoard');
+    if(!board) return;
+    board.innerHTML = '<div class="board-title">みんなの ようす</div>'
+      + '<div class="board-rows">'
+      + this.players.map((pl,i)=>{
+          const isTurn = (i===this.turn);
+          const bal = (pl.balance!==undefined)? yen(pl.balance) : '—';
+          const neg = pl.balance<0 ? ' neg' : '';
+          return '<div class="board-row'+(isTurn?' now':'')+'">'
+            + '<span class="br-name">'+(isTurn?'▶ ':'')+this.escapeHtml(pl.name)+'</span>'
+            + '<span class="br-bal'+neg+'">'+bal+'</span></div>';
+        }).join('')
+      + '</div>';
+  },
+
+  /* ---- 複数人 結果画面（全員ならべて見せる） ---- */
+  mEndScreen(){
+    const leftover = document.getElementById('charPop');
+    if(leftover) leftover.remove();
+    const host = document.getElementById('mResultList');
+    host.innerHTML = '';
+    this.players.forEach(pl => {
+      const plus = pl.balance >= 0;
+      const course = pl.savingCourse;
+      const goal = course ? course.goal : 0;
+      let stars;
+      if(pl.balance>=0 && (course? pl.balance>=goal : true)) stars=3;
+      else if(pl.balance>=0) stars=2; else stars=1;
+      let starHtml='';
+      for(let s=0;s<3;s++) starHtml += '<span class="star '+(s<stars?'on':'')+'">★</span>';
+      const card = document.createElement('div');
+      card.className = 'result-card';
+      card.innerHTML =
+        '<div class="rc-name">'+this.escapeHtml(pl.name)+'</div>'
+        + '<div class="rc-bal'+(plus?'':' neg')+'">'+yen(pl.balance)+'</div>'
+        + '<div class="rc-goal">目標：'+(course?course.label:'—')+'</div>'
+        + '<div class="rc-stars">'+starHtml+'</div>';
+      host.appendChild(card);
+    });
+    // 話し合いのきっかけ
+    const talk = document.getElementById('mTalk');
+    if(talk){
+      talk.innerHTML = '<div class="talk-title">みんなで 話してみよう</div>'
+        + '<div class="talk-line">・どうして お金が ふえた人と へった人が いるのかな？</div>'
+        + '<div class="talk-line">・同じ カードでも、えらび方が ちがうと どうなった？</div>'
+        + '<div class="talk-line">・つぎに あそぶなら、どこを かえてみたい？</div>'
+        + '<div class="talk-line">・お金を ぜんぶ つかうのと、のこすのは、どちらが よかった？</div>';
+    }
+    this.show('mend');
+  },
+
+  escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); },
 
   /* 貯金チャレンジ画面へ */
   goChallenge(){
@@ -230,6 +540,7 @@ const GAME = {
 
   /* 資格を取ったとき：50%でランクアップを「3枚以上あと」に差し込む */
   tryScheduleRankup(){
+    if(this.multi) return;                // 複数人モードでは共通デッキを崩さない
     if(!this.rankCard) return;            // ランクアップ自体が無い回
     if(Math.random() >= 0.5) return;      // 半々で出ない
     const earliest = this.idx + 4;        // 今のカードから3枚以上あと（=4枚目以降）
@@ -249,7 +560,9 @@ const GAME = {
   },
 
   refreshHud(){
+    if(this.multi){ this.mRefreshBoard(); return; }
     const bal = document.getElementById('gBal');
+    if(!bal) return;
     bal.textContent = yen(this.balance);
     bal.classList.toggle('neg', this.balance<0);
     document.getElementById('gRem').textContent = (this.deck.length - this.idx)+'まい';
@@ -326,10 +639,19 @@ const GAME = {
     b.classList.remove('faded');
     b.classList.add('picked');
     let extraMsg = '';
+    let fxKind = null;
     if(o.lottery){
       this.pay(o.cost);
-      this.scheduleLottery();   // 3枚あとに 抽選結果カードを差し込む
-      extraMsg = '宝くじを 買ったよ。3まい あとに 抽選が あるよ！';
+      if(this.multi){
+        // 複数人モードでは共通デッキを崩さないため、その場で当落を出す
+        const L = CONFIG.LOTTERY;
+        const win = Math.random() < L.winRate;
+        if(win){ this.gain(L.prize); extraMsg = 'なんと 大当たり！'+L.prize.toLocaleString('ja-JP')+'えん 当たった！'; fxKind='excited'; }
+        else { extraMsg = '宝くじは はずれ…（'+L.inGameText+'）'; fxKind='minus'; }
+      } else {
+        this.scheduleLottery();   // 3枚あとに 抽選結果カードを差し込む
+        extraMsg = '宝くじを 買ったよ。3まい あとに 抽選が あるよ！';
+      }
     } else {
       this.pay(o.cost);
     }
@@ -339,8 +661,7 @@ const GAME = {
     }
     if(o.note){ extraMsg = (extraMsg?extraMsg+' ':'') + o.note; }
     const base = o.cost>0 ? (o.text+'を えらんで '+o.cost.toLocaleString('ja-JP')+'えん 払ったよ') : (o.text+'を えらんだよ（0えん）');
-    // 緑カードは「自分で選ぶ買い物」。演出は出さない。
-    this.afterAction(body, extraMsg ? base+'／'+extraMsg : base, null);
+    this.afterAction(body, extraMsg ? base+'／'+extraMsg : base, fxKind);
   },
 
   /* 宝くじ：当落を今のうちに決めて、抽選結果カードを delay 枚あとに差し込む */
@@ -513,8 +834,17 @@ const GAME = {
     }
     const next = document.createElement('button');
     next.className='btn btn-primary'; next.style.marginTop='12px';
-    next.textContent = (this.idx+1 >= this.deck.length) ? 'けっかを みる' : 'つぎの カードへ';
-    next.onclick = () => { this.idx++; this.refreshHud(); this.cardBack(); };
+    if(this.multi && this._afterHook){
+      // 複数人モード：最後の人の最後のカードなら「結果」、それ以外は「つぎへ」
+      const lastCard = (this.idx+1 >= this.deck.length);
+      const lastPlayer = (this.turn+1 >= this.playerCount);
+      next.textContent = (lastCard && lastPlayer) ? 'けっかを みる' : 'つぎへ';
+      const hook = this._afterHook;
+      next.onclick = () => { this._afterHook = null; hook(); };
+    } else {
+      next.textContent = (this.idx+1 >= this.deck.length) ? 'けっかを みる' : 'つぎの カードへ';
+      next.onclick = () => { this.idx++; this.refreshHud(); this.cardBack(); };
+    }
     body.appendChild(next);
     if(fx){
       // 演出を出している間は「つぎへ」を隠し、消えてから出す
@@ -651,7 +981,7 @@ const GAME = {
       + pick.map(t=>'<div class="reflect-line">・'+t+'</div>').join('');
   },
 
-  restart(){ this.selections={}; this.flags={}; this.balance=0; this.idx=0; this.savingCourse=null; this.rankCard=null; this.show('menu'); }
+  restart(){ this.selections={}; this.flags={}; this.balance=0; this.idx=0; this.savingCourse=null; this.rankCard=null; this.multi=false; this.players=[]; this.turn=0; this.setupIdx=0; this._afterHook=null; this._cur=null; this.show('menu'); }
 };
 
 function yen(n){ return n.toLocaleString('ja-JP') + 'えん'; }
