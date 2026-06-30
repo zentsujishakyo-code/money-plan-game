@@ -318,19 +318,21 @@ const GAME = {
     }
   },
 
-  /* 今の手番の人の 残高だけを 大きく表示（他の人の残高は見せない） */
+  /* 今の手番の人の 残高と のこりカードを 上部HUDに表示（一人用と同じ位置） */
   mRefreshBoard(){
     this.mRenderFixedBar();
-    const board = document.getElementById('mBoard');
-    if(!board) return;
+    const balEl = document.getElementById('mBal');
+    if(!balEl) return;
     const pl = this.players[this.turn];
-    if(!pl){ board.innerHTML=''; return; }
-    const neg = pl.balance<0 ? ' neg' : '';
-    board.innerHTML =
-      '<div class="my-bal-box">'
-      + '<div class="mb-label">'+this.escapeHtml(pl.name)+' さんの ざんだか</div>'
-      + '<div class="mb-bal'+neg+'">'+yen(pl.balance)+'</div>'
-      + '</div>';
+    if(!pl) return;
+    // 操作中の人は、書き戻し前でも最新の残高(this.balance)を見せる
+    const bal = (this._cur === pl) ? this.balance : pl.balance;
+    balEl.textContent = yen(bal);
+    balEl.classList.toggle('neg', bal<0);
+    const label = document.getElementById('mBalLabel');
+    if(label) label.textContent = this.escapeHtml(pl.name)+' さんの ざんだか';
+    const rem = document.getElementById('mRem');
+    if(rem) rem.textContent = (this.deck.length - this.idx)+'まい';
   },
 
   /* ---- 複数人 結果画面（全員ならべて見せる） ---- */
