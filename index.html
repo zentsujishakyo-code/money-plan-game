@@ -277,13 +277,6 @@
   .turn-label{ text-align:center; font-size:16px; font-weight:700; color:var(--green-d); margin:8px 0 12px; }
   .turn-mini{ font-size:13px; color:#fff; opacity:.9; margin-bottom:4px; }
 
-  /* みんなのようす（ボード） */
-  .my-bal-box{ margin-top:16px; border-top:1px solid var(--line); padding-top:14px; text-align:center; }
-  .mb-label{ font-size:13px; color:var(--muted); margin-bottom:4px; }
-  .mb-bal{ font-size:30px; font-weight:800; color:var(--green-d); }
-  .mb-bal.neg{ color:var(--red); }
-  .board{ margin-top:16px; }
-
   /* 結果（全員ならべる） */
   .result-list{ display:flex; flex-direction:column; gap:12px; margin:8px 0 16px; }
   .result-card{ border:2px solid var(--line); border-radius:14px; padding:14px 16px; background:#fff; }
@@ -487,9 +480,12 @@
 
   <!-- M4: ゲーム本編 -->
   <section class="screen" id="s-mgame">
+    <div class="hud">
+      <div><div class="lbl" id="mBalLabel">いまの ざんだか</div><div class="bal" id="mBal">0えん</div></div>
+      <div><div class="lbl">のこりカード</div><div class="rem" id="mRem">0まい</div></div>
+    </div>
     <div class="mfixed" id="mFixedBar"></div>
     <div id="mStage"></div>
-    <div class="board" id="mBoard"></div>
   </section>
 
   <!-- M5: 結果（全員ならべる） -->
