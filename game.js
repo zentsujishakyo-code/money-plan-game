@@ -47,16 +47,17 @@ const GAME = {
      みんなで遊ぶモード（複数人・パスアンドプレイ）
      ================================================================= */
 
-  /* 「みんなで遊ぶ」を選んだ：難易度を決める画面へ */
+  /* 「みんなで遊ぶ」を選んだ：人数を決める画面へ（難易度はタイトルで選択済み） */
   startMulti(){
     this.multi = true;
     this.players = [];
     this.salary = CONFIG.SALARY;
+    this.diff = CONFIG.DIFFICULTY_SETS[CONFIG.DIFFICULTY] || CONFIG.DIFFICULTY_SETS.easy;
     document.getElementById('sumSalary').textContent = yen(this.salary);
-    this.show('mdiff');
+    this.show('mcount');
   },
 
-  /* 難易度を選んだ：人数を決める画面へ */
+  /* （未使用）難易度画面：タイトルの難易度を使うため不要だが互換のため残す */
   mSetDiff(key){
     CONFIG.DIFFICULTY = key;
     ['easy','normal'].forEach(k=>{
@@ -183,15 +184,40 @@ const GAME = {
 
   /* ---- 複数人ゲーム開始 ---- */
   mStartGame(){
-    // 全員 共通のデッキを1つ作る（順番も共通）
+    // 全員 共通のデッキを1つ作る。宝くじの抽選カードと資格のランクアップカードは
+    // 全員に同じ位置で出し、結果だけ各プレイヤーの選択・状況で変える（案A）。
     this.selections = this.players[0].selections; // buildDeck内の参照用（高額判定等）
     this.flags = {};
-    this.deck = this.buildDeck();
-    this.idx = 0;        // いま何枚目のカードか（全員共通で進む）
+    let deck = this.buildDeck();
+    deck = this.mInjectFeaturedResults(deck);  // 抽選カード・ランクアップを固定配置
+    this.deck = deck;
+    this.idx = 0;        // いま何枚目か（全員 同じ位置で進む）
     this.turn = 0;       // いまそのカードを引く人
-    this.players.forEach(pl => { pl.flags={}; pl.paidFixed={}; pl.rankCard=null; pl.log=[]; });
+    this.players.forEach(pl => { pl.flags={}; pl.paidFixed={}; pl.boughtLottery=false; pl.lotteryWin=null; pl.log=[]; });
     this.show('mgame');
     this.mAnnounce();
+  },
+
+  /* 複数人用：宝くじカードの3枚あとに抽選カード、資格カードの後にランクアップを固定で入れる */
+  mInjectFeaturedResults(deck){
+    // 宝くじカードの位置を探し、その delay 枚あとに抽選カードを入れる
+    const lotIdx = deck.findIndex(c => c.type==='green' && c.options && c.options.some(o=>o.lottery));
+    if(lotIdx >= 0 && !deck.some(c=>c.type==='lottery_result')){
+      const at = Math.min(lotIdx + 1 + CONFIG.LOTTERY.delay, deck.length);
+      deck.splice(at, 0, { type:'lottery_result', title:'宝くじの 抽選日！', icon:'gift' });
+    }
+    // 資格カードの位置を探し、その3枚あと以降にランクアップを入れる（無ければ元データから）
+    const shiIdx = deck.findIndex(c => c.type==='green' && c.options && c.options.some(o=>o.setsFlag==='shikaku'));
+    let rank = deck.find(c => c.requireFlag==='shikaku');
+    if(!rank){ rank = CONFIG.CARDS.find(c => c.requireFlag==='shikaku'); }
+    // すでにデッキにランクアップがあれば抜いて、資格の後ろへ置き直す
+    const existing = deck.findIndex(c => c.requireFlag==='shikaku');
+    if(existing >= 0) deck.splice(existing, 1);
+    if(shiIdx >= 0 && rank){
+      const at = Math.min(shiIdx + 3, deck.length);
+      deck.splice(at, 0, Object.assign({}, rank));
+    }
+    return deck;
   },
 
   /* 「○○さん、カードを引いてください」のお知らせ */
@@ -208,7 +234,7 @@ const GAME = {
       + '<button class="btn btn-primary" id="anBtn">カードを ひく</button>'
       + '</div>';
     this.mRefreshBoard();
-    document.getElementById('anBtn').onclick = () => this.mCardBack();
+    document.getElementById('anBtn').onclick = () => this.mReveal();
   },
 
   /* 裏向きカードを出して、タップでめくる */
@@ -294,6 +320,7 @@ const GAME = {
 
   /* 下部に全員の残高・選択をオープン表示 */
   mRefreshBoard(){
+    this.mRenderFixedBar();
     const board = document.getElementById('mBoard');
     if(!board) return;
     board.innerHTML = '<div class="board-title">みんなの ようす</div>'
@@ -346,6 +373,27 @@ const GAME = {
   },
 
   escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); },
+
+  /* 今の手番の人の 固定費バーを描く */
+  mRenderFixedBar(){
+    const bar = document.getElementById('mFixedBar');
+    if(!bar) return;
+    const pl = this.players[this.turn];
+    if(!pl || !pl.selections){ bar.innerHTML=''; return; }
+    const paid = pl.paidFixed || {};
+    bar.innerHTML = '<div class="mfx-name">'+this.escapeHtml(pl.name)+' さんの こていひ</div>'
+      + '<div class="mfx-row">'
+      + CONFIG.PAYDAY_CARDS.map(pc => {
+          const exp = CONFIG.EXPENSES.find(e=>e.key===pc.expenseKey);
+          const idx = pl.selections[pc.expenseKey];
+          const cost = (exp && idx!==undefined) ? exp.options[idx].cost : 0;
+          const name = (exp&&exp.name)?exp.name:pc.title;
+          const done = paid[pc.expenseKey] ? ' paid' : '';
+          return '<div class="fc'+done+'"><span class="fcname">'+name+'</span>'
+            + '<span class="fcyen">'+cost.toLocaleString('ja-JP')+'</span></div>';
+        }).join('')
+      + '</div>';
+  },
 
   /* 貯金チャレンジ画面へ */
   goChallenge(){
@@ -643,13 +691,12 @@ const GAME = {
     if(o.lottery){
       this.pay(o.cost);
       if(this.multi){
-        // 複数人モードでは共通デッキを崩さないため、その場で当落を出す
-        const L = CONFIG.LOTTERY;
-        const win = Math.random() < L.winRate;
-        if(win){ this.gain(L.prize); extraMsg = 'なんと 大当たり！'+L.prize.toLocaleString('ja-JP')+'えん 当たった！'; fxKind='excited'; }
-        else { extraMsg = '宝くじは はずれ…（'+L.inGameText+'）'; fxKind='minus'; }
+        // 案A：買ったことだけ記録。当落は後の「抽選日」カードで全員に見せる
+        this._cur.boughtLottery = true;
+        this._cur.lotteryWin = (Math.random() < CONFIG.LOTTERY.winRate);
+        extraMsg = '宝くじを 買ったよ。あとで 抽選が あるよ！';
       } else {
-        this.scheduleLottery();   // 3枚あとに 抽選結果カードを差し込む
+        this.scheduleLottery();   // 一人用：3枚あとに 抽選結果カードを差し込む
         extraMsg = '宝くじを 買ったよ。3まい あとに 抽選が あるよ！';
       }
     } else {
@@ -678,25 +725,38 @@ const GAME = {
   /* 宝くじの抽選結果カードを表示 */
   renderLotteryResult(card, body){
     const L = CONFIG.LOTTERY;
-    const win = card._win;
+    // 複数人モードでは、その人が買ったかどうかで表示を変える
+    const multi = this.multi;
+    const bought = multi ? !!(this._cur && this._cur.boughtLottery) : true;
+    const win = multi ? !!(this._cur && this._cur.lotteryWin) : !!card._win;
+
     const box = document.createElement('div');
-    box.className = 'bigbox '+(win?'box-ok':'box-warn');
-    box.style.marginBottom = '12px';
-    box.innerHTML = win
-      ? '<div class="k">大当たり！</div><div class="v">'+L.prize.toLocaleString('ja-JP')+'えん 当たった！</div>'
-      : '<div class="k">はずれ…</div><div class="v">買った '+L.cost.toLocaleString('ja-JP')+'えんは もどってきません</div>';
+    if(multi && !bought){
+      // 買っていない人：抽選なし
+      box.className = 'bigbox';
+      box.style.marginBottom = '12px';
+      box.innerHTML = '<div class="k">抽選日</div><div class="v" style="font-size:16px;">あなたは 宝くじを 買わなかったので、抽選は ありません</div>';
+    } else {
+      box.className = 'bigbox '+(win?'box-ok':'box-warn');
+      box.style.marginBottom = '12px';
+      box.innerHTML = win
+        ? '<div class="k">大当たり！</div><div class="v">'+L.prize.toLocaleString('ja-JP')+'えん 当たった！</div>'
+        : '<div class="k">はずれ…</div><div class="v">買った '+L.cost.toLocaleString('ja-JP')+'えんは もどってきません</div>';
+    }
     body.appendChild(box);
 
-    // 確率の説明（ゲーム内＋本物）
+    // 確率の説明（全員に見せる）
     const note = document.createElement('div');
     note.className = 'lottery-note';
-    note.innerHTML =
-      '<p>'+L.inGameText+'</p>'
-      + '<p>'+L.realText+'</p>';
+    note.innerHTML = '<p>'+L.inGameText+'</p>' + '<p>'+L.realText+'</p>';
     body.appendChild(note);
 
-    if(win) this.gain(L.prize);
-    this.afterAction(body, '', win?'excited':'minus');
+    let fx = null;
+    if(bought){
+      if(win){ this.gain(L.prize); fx='excited'; }
+      else { fx='minus'; }
+    }
+    this.afterAction(body, '', fx);
   },
 
   /* マイナスになる買い物の確認ダイアログ */
@@ -742,6 +802,12 @@ const GAME = {
   markFixedPaid(key){
     this.paidFixed = this.paidFixed || {};
     this.paidFixed[key] = true;
+    if(this.multi){
+      // 手番の人のデータに記録し、バーを描き直す
+      if(this._cur){ this._cur.paidFixed = this.paidFixed; }
+      this.mRenderFixedBar();
+      return;
+    }
     const cell = document.getElementById('fc-'+key);
     if(cell) cell.classList.add('paid');
   },
