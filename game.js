@@ -318,21 +318,18 @@ const GAME = {
     }
   },
 
-  /* 下部に全員の残高・選択をオープン表示 */
+  /* 今の手番の人の 残高だけを 大きく表示（他の人の残高は見せない） */
   mRefreshBoard(){
     this.mRenderFixedBar();
     const board = document.getElementById('mBoard');
     if(!board) return;
-    board.innerHTML = '<div class="board-title">みんなの ようす</div>'
-      + '<div class="board-rows">'
-      + this.players.map((pl,i)=>{
-          const isTurn = (i===this.turn);
-          const bal = (pl.balance!==undefined)? yen(pl.balance) : '—';
-          const neg = pl.balance<0 ? ' neg' : '';
-          return '<div class="board-row'+(isTurn?' now':'')+'">'
-            + '<span class="br-name">'+(isTurn?'▶ ':'')+this.escapeHtml(pl.name)+'</span>'
-            + '<span class="br-bal'+neg+'">'+bal+'</span></div>';
-        }).join('')
+    const pl = this.players[this.turn];
+    if(!pl){ board.innerHTML=''; return; }
+    const neg = pl.balance<0 ? ' neg' : '';
+    board.innerHTML =
+      '<div class="my-bal-box">'
+      + '<div class="mb-label">'+this.escapeHtml(pl.name)+' さんの ざんだか</div>'
+      + '<div class="mb-bal'+neg+'">'+yen(pl.balance)+'</div>'
       + '</div>';
   },
 
