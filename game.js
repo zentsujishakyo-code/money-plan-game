@@ -351,23 +351,32 @@ const GAME = {
       else if(pl.balance>=0) stars=2; else stars=1;
       let starHtml='';
       for(let s=0;s<3;s++) starHtml += '<span class="star '+(s<stars?'on':'')+'">★</span>';
+      // その人の ふりかえりコメント（一人用と同じ粒度）
+      const refl = this.buildReflection({ selections:pl.selections, flags:pl.flags, balance:pl.balance });
+      const reflHtml = '<div class="rc-reflect">'
+        + refl.map(t=>'<div class="rc-rline">・'+t+'</div>').join('')
+        + '</div>';
       const card = document.createElement('div');
       card.className = 'result-card';
       card.innerHTML =
-        '<div class="rc-name">'+this.escapeHtml(pl.name)+'</div>'
+        '<div class="rc-top">'
+        + '<div class="rc-name">'+this.escapeHtml(pl.name)+'</div>'
         + '<div class="rc-bal'+(plus?'':' neg')+'">'+yen(pl.balance)+'</div>'
         + '<div class="rc-goal">目標：'+(course?course.label:'—')+'</div>'
-        + '<div class="rc-stars">'+starHtml+'</div>';
+        + '<div class="rc-stars">'+starHtml+'</div>'
+        + '</div>'
+        + reflHtml;
       host.appendChild(card);
     });
-    // 話し合いのきっかけ
+    // 話し合いのきっかけ（毎回ランダムで いくつか）
     const talk = document.getElementById('mTalk');
     if(talk){
+      const all = (CONFIG.TALK_QUESTIONS || []).slice();
+      const n = CONFIG.TALK_SHOW || 4;
+      shuffle(all);
+      const pick = all.slice(0, Math.min(n, all.length));
       talk.innerHTML = '<div class="talk-title">みんなで 話してみよう</div>'
-        + '<div class="talk-line">・どうして お金が ふえた人と へった人が いるのかな？</div>'
-        + '<div class="talk-line">・同じ カードでも、えらび方が ちがうと どうなった？</div>'
-        + '<div class="talk-line">・つぎに あそぶなら、どこを かえてみたい？</div>'
-        + '<div class="talk-line">・お金を ぜんぶ つかうのと、のこすのは、どちらが よかった？</div>';
+        + pick.map(q=>'<div class="talk-line">・'+q+'</div>').join('');
     }
     this.show('mend');
   },
@@ -1023,26 +1032,39 @@ const GAME = {
   },
 
   /* プレイ内容に応じた ふりかえりの一言 */
-  renderReflection(){
-    const host = document.getElementById('endReflect');
-    if(!host) return;
+  /* ふりかえりコメントを作る（一人用・複数人 共通）。
+     data = { selections, flags, balance } */
+  buildReflection(data){
+    const sel = data.selections || {};
+    const flags = data.flags || {};
+    const labelOf = (key) => {
+      const exp = CONFIG.EXPENSES.find(e=>e.key===key);
+      const i = sel[key];
+      return (exp && i!==undefined) ? exp.options[i].label : null;
+    };
     const msgs = [];
-    // プランの選択から
-    if(this.expenseLabel('food')==='C') msgs.push('じすいを えらんで、食費を かしこく おさえたね。');
-    if(this.expenseLabel('util')==='C') msgs.push('電気・ガス・水道を 節約できたね。');
-    if(this.expenseLabel('phone')==='C') msgs.push('スマホを 格安プランにして かしこい！');
-    if(this.flags.shikaku) msgs.push('資格の 勉強を がんばったね。学びは 将来の ちからに なるよ。');
-    // 残高から
-    if(this.balance < 0){
+    if(labelOf('food')==='C') msgs.push('じすいを えらんで、食費を かしこく おさえたね。');
+    if(labelOf('util')==='C') msgs.push('電気・ガス・水道を 節約できたね。');
+    if(labelOf('phone')==='C') msgs.push('スマホを 格安プランにして かしこい！');
+    if(labelOf('food')==='A' && labelOf('home')==='A') msgs.push('べんりな くらしを えらんだね。そのぶん お金は たくさん つかうよ。');
+    if(flags.shikaku) msgs.push('資格の 勉強を がんばったね。学びは 将来の ちからに なるよ。');
+    if(data.balance < 0){
       msgs.push('お金が たりなくなる 場面も あったね。つぎは 先を 考えて つかってみよう。');
-    } else if(this.balance >= 20000){
+    } else if(data.balance >= 20000){
       msgs.push('しっかり お金を のこせたね。がまんする ちからが あるね。');
+    } else if(data.balance >= 0){
+      msgs.push('赤字に ならずに やりくりできたね。');
     }
     if(msgs.length===0){
       msgs.push('いろんな えらびかたを ためせたね。つぎは どうするか 考えてみよう。');
     }
-    // 最大3つまで
-    const pick = msgs.slice(0,3);
+    return msgs.slice(0,3);
+  },
+
+  renderReflection(){
+    const host = document.getElementById('endReflect');
+    if(!host) return;
+    const pick = this.buildReflection({ selections:this.selections, flags:this.flags, balance:this.balance });
     host.innerHTML = '<div class="reflect-title">ふりかえり</div>'
       + pick.map(t=>'<div class="reflect-line">・'+t+'</div>').join('');
   },
