@@ -30,9 +30,10 @@ const GAME = {
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
     document.getElementById('s-'+id).classList.add('active');
     window.scrollTo(0,0);
-    // ゲーム中の画面だけ BGMを鳴らす
+    // BGMの切り替え：ゲーム中は bgm、結果画面は ending、それ以外は無音
     if(id==='game' || id==='mgame'){ this.playBgm(); }
-    else { this.stopBgm(); }
+    else if(id==='end' || id==='mend'){ this.playEnding(); }
+    else { this.stopAllBgm(); }
   },
 
   start(where){
@@ -48,20 +49,70 @@ const GAME = {
 
   goPlan(){ this.buildPlan(); this.show('plan'); },
 
-  /* BGM（ゲーム中だけ流す。設定でオン・オフ） */
-  _bgm: null,
+  /* BGM：ゲーム中は bgm.mp3、結果画面は ending.mp3。設定でオン・オフ */
+  _bgm: null,        // ゲーム中のBGM
+  _ending: null,     // 結果画面のBGM
+  _bgmVol: 0.4,      // ゲームBGMの通常音量
+  _endVol: 0.5,      // 結果BGMの通常音量
+  _fadeTimer: null,
+
   playBgm(){
     if(!this.bgmOn) return;
+    // 結果BGMが鳴っていたら止める
+    if(this._ending){ this._ending.pause(); this._ending.currentTime = 0; }
     if(!this._bgm){
       this._bgm = new Audio('bgm.mp3');
       this._bgm.loop = true;
-      this._bgm.volume = 0.4;
     }
-    // すでに再生中なら何もしない
-    this._bgm.play().catch(()=>{});  // 自動再生がブロックされても静かに無視
+    this._bgm.volume = this._bgmVol;
+    this._bgm.play().catch(()=>{});
   },
-  stopBgm(){
-    if(this._bgm){ this._bgm.pause(); this._bgm.currentTime = 0; }
+
+  /* 結果画面：ゲームBGMをフェードアウトして、endingを鳴らす */
+  playEnding(){
+    if(!this.bgmOn){ this.stopAllBgm(); return; }
+    if(!this._ending){
+      this._ending = new Audio('ending.mp3');
+      this._ending.loop = true;
+    }
+    const startEnding = () => {
+      this._ending.volume = this._endVol;
+      this._ending.play().catch(()=>{});
+    };
+    // ゲームBGMが鳴っているなら、フェードアウトしてから ending
+    if(this._bgm && !this._bgm.paused){
+      this.fadeOut(this._bgm, 800, () => {
+        this._bgm.pause(); this._bgm.currentTime = 0;
+        this._bgm.volume = this._bgmVol;
+        startEnding();
+      });
+    } else {
+      startEnding();
+    }
+  },
+
+  /* audioを ms かけて 音量0まで下げ、終わったら done() */
+  fadeOut(audio, ms, done){
+    if(this._fadeTimer){ clearInterval(this._fadeTimer); }
+    const steps = 16;
+    const startVol = audio.volume;
+    let i = 0;
+    this._fadeTimer = setInterval(() => {
+      i++;
+      audio.volume = Math.max(0, startVol * (1 - i/steps));
+      if(i >= steps){
+        clearInterval(this._fadeTimer); this._fadeTimer = null;
+        if(done) done();
+      }
+    }, ms/steps);
+  },
+
+  stopBgm(){ if(this._bgm){ this._bgm.pause(); this._bgm.currentTime = 0; } },
+  stopEnding(){ if(this._ending){ this._ending.pause(); this._ending.currentTime = 0; } },
+  stopAllBgm(){
+    if(this._fadeTimer){ clearInterval(this._fadeTimer); this._fadeTimer = null; }
+    if(this._bgm){ this._bgm.pause(); this._bgm.currentTime = 0; this._bgm.volume = this._bgmVol; }
+    if(this._ending){ this._ending.pause(); this._ending.currentTime = 0; this._ending.volume = this._endVol; }
   },
 
   /* 設定画面 */
@@ -81,11 +132,11 @@ const GAME = {
     this.bgmOn = !this.bgmOn;
     const t = document.getElementById('setBgmToggle');
     if(t) t.classList.toggle('on', this.bgmOn);
-    // オフにしたら今すぐ止める。オンにしてゲーム画面ならすぐ鳴らす
-    if(!this.bgmOn){ this.stopBgm(); }
+    if(!this.bgmOn){ this.stopAllBgm(); }
     else {
       const active = document.querySelector('.screen.active');
       if(active && (active.id==='s-game' || active.id==='s-mgame')){ this.playBgm(); }
+      else if(active && (active.id==='s-end' || active.id==='s-mend')){ this.playEnding(); }
     }
   },
 
