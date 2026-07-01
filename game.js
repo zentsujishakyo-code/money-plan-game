@@ -341,7 +341,7 @@ const GAME = {
     if(!pl) return;
     // 操作中の人は、書き戻し前でも最新の残高(this.balance)を見せる
     const curBal = (this._cur === pl) ? this.balance : pl.balance;
-    balEl.textContent = yen(curBal);
+    balEl.textContent = yenSign(curBal);
     balEl.classList.toggle('neg', curBal<0);
     const label = document.getElementById('mBalLabel');
     if(label) label.textContent = this.escapeHtml(pl.name)+' さんの ざんだか';
@@ -360,7 +360,7 @@ const GAME = {
               const neg = bal<0 ? ' neg' : '';
               return '<div class="board-row'+(isTurn?' now':'')+'">'
                 + '<span class="br-name">'+(isTurn?'▶ ':'')+this.escapeHtml(p.name)+'</span>'
-                + '<span class="br-bal'+neg+'">'+yen(bal)+'</span></div>';
+                + '<span class="br-bal'+neg+'">'+yenSign(bal)+'</span></div>';
             }).join('')
           + '</div>';
       } else {
@@ -394,7 +394,7 @@ const GAME = {
       card.innerHTML =
         '<div class="rc-top">'
         + '<div class="rc-name">'+this.escapeHtml(pl.name)+'</div>'
-        + '<div class="rc-bal'+(plus?'':' neg')+'">'+yen(pl.balance)+'</div>'
+        + '<div class="rc-bal'+(plus?'':' neg')+'">'+yenSign(pl.balance)+'</div>'
         + '<div class="rc-goal">目標：'+(course?course.label:'—')+'</div>'
         + '<div class="rc-stars">'+starHtml+'</div>'
         + '</div>'
@@ -653,7 +653,7 @@ const GAME = {
     if(this.multi){ this.mRefreshBoard(); return; }
     const bal = document.getElementById('gBal');
     if(!bal) return;
-    bal.textContent = yen(this.balance);
+    bal.textContent = yenSign(this.balance);
     bal.classList.toggle('neg', this.balance<0);
     document.getElementById('gRem').textContent = (this.deck.length - this.idx)+'まい';
   },
@@ -781,6 +781,8 @@ const GAME = {
   confirmReselectable(card, body){
     const o = this._greenPicked;
     if(!o) return;
+    // 福祉的な選択（募金・家族など）のフラグを立てる（確定した選択だけ）
+    if(o.valueFlag){ this.flags[o.valueFlag] = true; }
     // 次へ進む（支払いは選択時に反映済み）
     if(this.multi && this._afterHook){
       const hook = this._afterHook;
@@ -901,7 +903,7 @@ const GAME = {
     mask.innerHTML =
       '<div class="warnbox">'
       + '<div class="wh">お金が たりないよ</div>'
-      + '<div class="wb">これを 買うと、のこりが <b>'+yen(after)+'</b> に なります。<br>お金が ないのに 買うと、あとで こまるかも。<br>それでも 買いますか？</div>'
+      + '<div class="wb">これを 買うと、のこりが <b>'+yenSign(after)+'</b> に なります。<br>お金が ないのに 買うと、あとで こまるかも。<br>それでも 買いますか？</div>'
       + '<div class="wrow">'
       + '<button class="btn btn-cancel" id="warnNo">やめておく</button>'
       + '<button class="btn btn-primary" id="warnYes">それでも 買う</button>'
@@ -1114,7 +1116,7 @@ const GAME = {
     const bigMinus = (this.balance < 0) && (Math.abs(this.balance) > threshold);
     const m = plus ? e.plus : (bigMinus && e.bigminus ? e.bigminus : e.minus);
     const balEl = document.getElementById('endBal');
-    balEl.textContent = yen(this.balance);
+    balEl.textContent = yenSign(this.balance);
     balEl.classList.toggle('neg', this.balance<0);
     const big = document.getElementById('endBig');
     big.textContent = plus ? 'プラスで おわったね' : (bigMinus ? 'つかいすぎ かも…' : 'マイナスで おわったね');
@@ -1168,13 +1170,19 @@ const GAME = {
       return (exp && i!==undefined) ? exp.options[i].label : null;
     };
     const msgs = [];
+    // お金以外の価値（福祉教育）を いちばんに 肯定する
+    if(flags.tasukeai) msgs.push('こまっている 人の ために 募金できたね。やさしい きもちは とても 大切だよ。');
+    if(flags.volunteer) msgs.push('ボランティアに 行くことを えらんだね。お金だけでは できない 助け合いだね。');
+    if(flags.kazoku) msgs.push('家族の おいわいに お金を つかえたね。大切な 人との 時間は たからものだよ。');
+    if(flags.omoiyari) msgs.push('お世話に なった 人へ 気もちを おくれたね。思いやりは お金には かえられないね。');
+    // お金のやりくり
     if(labelOf('food')==='C') msgs.push('じすいを えらんで、食費を かしこく おさえたね。');
     if(labelOf('util')==='C') msgs.push('電気・ガス・水道を 節約できたね。');
     if(labelOf('phone')==='C') msgs.push('スマホを 格安プランにして かしこい！');
     if(labelOf('food')==='A' && labelOf('home')==='A') msgs.push('べんりな くらしを えらんだね。そのぶん お金は たくさん つかうよ。');
     if(flags.shikaku) msgs.push('資格の 勉強を がんばったね。学びは 将来の ちからに なるよ。');
     if(data.balance < 0){
-      msgs.push('お金が たりなくなる 場面も あったね。つぎは 先を 考えて つかってみよう。');
+      msgs.push('お金が たりなくなる 場面も あったね。でも、お金が たりない ときに 助けてくれる 人や しくみも あるよ。');
     } else if(data.balance >= 20000){
       msgs.push('しっかり お金を のこせたね。がまんする ちからが あるね。');
     } else if(data.balance >= 0){
@@ -1198,5 +1206,7 @@ const GAME = {
 };
 
 function yen(n){ return n.toLocaleString('ja-JP') + 'えん'; }
+/* 色に頼らない表示：マイナスは ▼ を付けて、色が見えなくても分かるようにする */
+function yenSign(n){ return (n<0 ? '▼ ' : '') + Math.abs(n).toLocaleString('ja-JP') + 'えん'; }
 function rubyWrap(base, reading){ return '<ruby>'+base+'<rt>'+reading+'</rt></ruby>'; }
 function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
