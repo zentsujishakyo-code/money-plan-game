@@ -115,6 +115,21 @@ const GAME = {
     if(this._ending){ this._ending.pause(); this._ending.currentTime = 0; this._ending.volume = this._endVol; }
   },
 
+  /* 効果音（SE）：その瞬間だけ短く鳴らす。設定のBGMがオフなら鳴らさない */
+  _se: {},
+  _seVol: 0.6,
+  playSe(name){
+    if(!this.bgmOn) return;   // 音の設定がオフなら効果音も鳴らさない
+    let a = this._se[name];
+    if(!a){
+      a = new Audio(name + '.mp3');
+      a.volume = this._seVol;
+      this._se[name] = a;
+    }
+    try { a.currentTime = 0; } catch(e){}
+    a.play().catch(()=>{});
+  },
+
   /* 設定画面 */
   openSettings(){
     const t = document.getElementById('setBalToggle');
@@ -348,6 +363,7 @@ const GAME = {
 
   /* カードをめくって、いまの人の選択を受け付ける */
   mReveal(){
+    this.playSe('card');   // めくる音
     const card = this.deck[this.idx];
     const pl = this.players[this.turn];
     // 一人用の reveal を再利用するため、現在プレイヤーの状態を GAME 本体に橋渡しする
@@ -758,6 +774,7 @@ const GAME = {
   },
 
   reveal(){
+    this.playSe('card');   // めくる音
     const card = this.deck[this.idx];
     const stage = document.getElementById('gStage');
     stage.innerHTML = '';
@@ -865,6 +882,8 @@ const GAME = {
   confirmReselectable(card, body){
     const o = this._greenPicked;
     if(!o) return;
+    // 支払いがあったときだけ 支払い音（0円＝買わない は鳴らさない）
+    if(o.cost > 0){ this.playSe('payment'); }
     // 福祉的な選択（募金・家族など）のフラグを立てる（確定した選択だけ）
     if(o.valueFlag){ this.flags[o.valueFlag] = true; }
     // 次へ進む（支払いは選択時に反映済み）
@@ -902,6 +921,8 @@ const GAME = {
 
   /* 緑カードの選択を実行する */
   applyGreenChoice(card, o, b, body){
+    // 支払いがあれば 支払い音（宝くじ購入・資格の勉強代なども）
+    if(o.cost > 0){ this.playSe('payment'); }
     // 選ばなかった選択肢は薄くし、選んだものだけ目立たせる
     body.querySelectorAll('.choice').forEach(x=>{ x.disabled=true; x.classList.add('faded'); });
     b.classList.remove('faded');
@@ -1011,6 +1032,7 @@ const GAME = {
     b.textContent = opt.cost.toLocaleString('ja-JP')+'えん 払う';
     b.onclick = () => {
       b.remove();
+      this.playSe('payment');   // 支払い音
       this.pay(opt.cost);
       this.markFixedPaid(card.expenseKey);
       this.afterAction(body, '毎月の 固定費を 払ったよ', null);
@@ -1142,6 +1164,9 @@ const GAME = {
 
   /* 演出フック（残高の色変化＋揺れ＋キャラのポップアップ）。表示時間(ms)を返す */
   playFx(kind){
+    // 効果音：うれしい系は lucky、残念系は unlucky
+    if(kind==='plus' || kind==='excited'){ this.playSe('lucky'); }
+    else if(kind==='minus' || kind==='bigminus' || kind==='sad'){ this.playSe('unlucky'); }
     const hud = document.querySelector('.hud');
     if(hud){
       hud.classList.remove('fx-plus','fx-minus','fx-bigminus');
