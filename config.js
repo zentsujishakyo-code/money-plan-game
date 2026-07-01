@@ -106,17 +106,17 @@ const CONFIG = {
     { type:"green", title:"お祭り", subtitle:"友達とお祭りにきました", icon:"festival",
       options:[ {label:"A",text:"好きなだけ買い物",cost:3000},{label:"B",text:"時々ガマンする",cost:1000},{label:"C",text:"花火だけ楽しむ",cost:0} ] },
     { type:"green", title:"プレゼント", subtitle:"お世話になった方へ…", icon:"gift",
-      options:[ {label:"A",text:"プレゼントを贈る（高い）",cost:10000},{label:"B",text:"プレゼントを贈る（安い）",cost:5000},{label:"C",text:"SNSでメッセージ",cost:0} ] },
+      options:[ {label:"A",text:"プレゼントを贈る（高い）",cost:10000,valueFlag:"omoiyari"},{label:"B",text:"プレゼントを贈る（安い）",cost:5000,valueFlag:"omoiyari"},{label:"C",text:"SNSでメッセージ",cost:0} ] },
     { type:"green", title:"電球", subtitle:"お風呂場の電球がきれた", icon:"bulb",
       options:[ {label:"A",text:"業者にお願いする",cost:4000},{label:"B",text:"自分で交換する",cost:1000},{label:"C",text:"そのままにする",cost:0} ] },
     { type:"green", title:"東京○○ランド", subtitle:"旅行に誘われた♪", icon:"park",
       options:[ {label:"A",text:"行く！",cost:30000},{label:"B",text:"香川県内の遊園地を提案",cost:5000},{label:"C",text:"行かない",cost:0} ] },
     { type:"green", title:"誕生日", subtitle:"家族のおたん生日です！", icon:"cake",
-      options:[ {label:"A",text:"お店のケーキを贈る",cost:5000},{label:"B",text:"手作りのケーキを贈る",cost:2000},{label:"C",text:"SNSで伝える",cost:0} ] },
+      options:[ {label:"A",text:"お店のケーキを贈る",cost:5000,valueFlag:"kazoku"},{label:"B",text:"手作りのケーキを贈る",cost:2000,valueFlag:"kazoku"},{label:"C",text:"SNSで伝える",cost:0} ] },
     { type:"green", title:"マンガ", subtitle:"話題のマンガの新刊が発売！", icon:"book",
       options:[ {label:"A",text:"新刊を買う",cost:2000},{label:"B",text:"レンタルで読む",cost:1000},{label:"C",text:"友達に借りて読む",cost:0} ] },
     { type:"green", title:"募金", subtitle:"大きな災害が発生！募金活動中", icon:"heart",
-      options:[ {label:"A",text:"募金する",cost:5000},{label:"B",text:"ボランティアに行く（交通費）",cost:3000},{label:"C",text:"今回は被災地の復興を祈る",cost:0} ] },
+      options:[ {label:"A",text:"募金する",cost:5000,valueFlag:"tasukeai"},{label:"B",text:"ボランティアに行く（交通費）",cost:3000,valueFlag:"volunteer"},{label:"C",text:"今回は被災地の復興を祈る",cost:0} ] },
     { type:"green", title:"スマホ", subtitle:"スマホの新機種が発売！", icon:"phone",
       options:[ {label:"A",text:"新機種を買う",cost:50000},{label:"B",text:"一つ前の機種を買う",cost:30000},{label:"C",text:"買わない",cost:0} ] },
     { type:"green", title:"お花見", subtitle:"会社の人にお花見に誘われた♪", icon:"festival",
@@ -207,7 +207,10 @@ const CONFIG = {
     "がまんして よかったこと・ざんねんだったことは ある？",
     "いちばん お金を のこせた人は、どんな くふうを していた？",
     "もし 本当の 生活なら、どの えらび方を してみたい？",
-    "来月も 同じ お給料なら、どんな くらしに する？"
+    "来月も 同じ お給料なら、どんな くらしに する？",
+    "お金が たりなくて こまっている 人が いたら、どうする？",
+    "「たすけ合い」って、どんなことが できると 思う？",
+    "お金では 買えない 大切なものは、なんだろう？"
   ],
   TALK_SHOW: 4   // 毎回 表示する数
 
