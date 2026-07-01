@@ -239,6 +239,20 @@
   .lottery-note p:last-child{ margin-bottom:0; }
 
   /* ===== みんなで遊ぶモード ===== */
+  .notice-icon{ font-size:38px; text-align:center; margin:6px 0 16px; }
+
+  /* 設定画面 */
+  .btn-ghost{ background:transparent; border:1.5px solid var(--line); color:var(--muted); font-size:15px; }
+  .setrow{ display:flex; align-items:center; justify-content:space-between; gap:14px; padding:6px 0 18px; text-align:left; }
+  .set-text{ flex:1; }
+  .set-name{ font-size:15px; font-weight:700; color:var(--ink); line-height:1.5; }
+  .set-sub{ font-size:12px; color:var(--muted); margin-top:4px; line-height:1.5; }
+  .toggle{ flex:0 0 auto; width:52px; height:30px; border-radius:15px; border:none; background:#ccc; position:relative; cursor:pointer; transition:background .15s; padding:0; }
+  .toggle.on{ background:var(--green); }
+  .toggle-knob{ position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%; background:#fff; transition:left .15s; }
+  .toggle.on .toggle-knob{ left:25px; }
+  .notice-p{ font-size:16px; line-height:1.9; color:var(--ink); margin:0 0 14px; text-align:left; }
+  .notice-p b{ color:var(--green-d); }
   .mfixed{ margin-bottom:10px; }
   .mfx-name{ font-size:12px; color:var(--muted); margin-bottom:6px; text-align:center; }
   .mfx-row{ display:flex; flex-wrap:wrap; gap:6px; }
@@ -278,6 +292,16 @@
   .turn-mini{ font-size:13px; color:#fff; opacity:.9; margin-bottom:4px; }
 
   /* 結果（全員ならべる） */
+  .board{ margin-top:16px; border-top:1px solid var(--line); padding-top:12px; }
+  .board-title{ font-size:13px; color:var(--muted); margin-bottom:8px; text-align:center; }
+  .board-rows{ display:flex; flex-direction:column; gap:6px; }
+  .board-row{ display:flex; justify-content:space-between; align-items:center;
+    padding:8px 12px; border-radius:10px; background:#fff; border:1px solid var(--line); }
+  .board-row.now{ border-color:var(--green); background:var(--ok-bg); }
+  .br-name{ font-weight:700; color:var(--ink); font-size:14px; }
+  .board-row.now .br-name{ color:var(--green-d); }
+  .br-bal{ font-weight:700; font-size:14px; color:var(--ink); }
+  .br-bal.neg{ color:var(--red); }
   .result-list{ display:flex; flex-direction:column; gap:12px; margin:8px 0 16px; }
   .result-card{ border:2px solid var(--line); border-radius:14px; padding:14px 16px; background:#fff; }
   .rc-top{ display:grid; grid-template-columns:1fr auto; grid-template-rows:auto auto; gap:2px 12px; align-items:center; }
@@ -363,6 +387,28 @@
       <div class="btn-row" style="margin-top:10px;">
         <button class="btn btn-sub" onclick="GAME.startMulti()">みんなで あそぶ</button>
       </div>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn btn-ghost" onclick="GAME.openSettings()">⚙ せってい</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 設定 -->
+  <section class="screen" id="s-settings">
+    <h1>せってい</h1>
+    <div class="panel">
+      <div class="setrow">
+        <div class="set-text">
+          <div class="set-name">みんなで あそぶとき、<br>ほかの 人の ざんだかを 見せる</div>
+          <div class="set-sub">オフにすると、じぶんの ばんの ざんだかだけ 見えます</div>
+        </div>
+        <button class="toggle on" id="setBalToggle" onclick="GAME.toggleShowBalance()">
+          <span class="toggle-knob"></span>
+        </button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="GAME.show('menu')">とじる</button>
+      </div>
     </div>
   </section>
 
@@ -443,6 +489,19 @@
 
   <!-- ▼ みんなで遊ぶモード ▼ -->
 
+  <!-- M0: 遊び方の注意 -->
+  <section class="screen" id="s-mnotice">
+    <h1>みんなで あそぶ まえに</h1>
+    <div class="panel">
+      <div class="notice-icon">📱➡️🟰</div>
+      <p class="notice-p">スマホや タブレットは、<b>つくえの 上などに おいて</b>、みんなが 見える かたちで あそんでね。</p>
+      <p class="notice-p">じゅんばんに カードを ひいて、ひとりずつ こたえます。ほかの 人の ばんも いっしょに 見て、「自分なら どうするかな？」と 考えると もっと たのしいよ。</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="GAME.mGoCount()">わかった！ つぎへ</button>
+      </div>
+    </div>
+  </section>
+
   <!-- M2: 人数 -->
   <section class="screen" id="s-mcount">
     <h1>なん人で あそぶ？</h1>
@@ -486,6 +545,7 @@
     </div>
     <div class="mfixed" id="mFixedBar"></div>
     <div id="mStage"></div>
+    <div class="board" id="mBoard"></div>
   </section>
 
   <!-- M5: 結果（全員ならべる） -->
