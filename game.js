@@ -765,39 +765,20 @@ const GAME = {
     }
   },
 
-  /* 選び直しカードの確定：メッセージを出して次へ */
+  /* 選び直しカードの確定：つぎへ1回で 確定＆次のカードへ */
   confirmReselectable(card, body){
     const o = this._greenPicked;
     if(!o) return;
-    // 選択肢を確定（押せなくする）
-    body.querySelectorAll('.choice').forEach(x=>{ x.disabled=true; if(!x.classList.contains('picked')) x.classList.add('faded'); });
-    const cf = document.getElementById('greenConfirm');
-    if(cf) cf.remove();
-    if(o.note){
-      const m = document.createElement('div');
-      m.className='resultmsg'; m.style.color='var(--muted)';
-      m.textContent = o.note;
-      body.appendChild(m);
-    }
-    // 次へ進む（afterActionの「つぎへ」を出す。支払いは既に反映済みなのでfxなし）
-    this.afterActionAfterReselect(body);
-  },
-
-  /* 選び直しカード用：支払いは反映済みなので、次へボタンだけ出す */
-  afterActionAfterReselect(body){
-    const next = document.createElement('button');
-    next.className='btn btn-primary'; next.style.marginTop='12px';
+    // 次へ進む（支払いは選択時に反映済み）
     if(this.multi && this._afterHook){
-      const lastCard = (this.idx+1 >= this.deck.length);
-      const lastPlayer = (this.turn+1 >= this.playerCount);
-      next.textContent = (lastCard && lastPlayer) ? 'けっかを みる' : 'つぎへ';
       const hook = this._afterHook;
-      next.onclick = () => { this._afterHook = null; hook(); };
+      this._afterHook = null;
+      hook();
     } else {
-      next.textContent = (this.idx+1 >= this.deck.length) ? 'けっかを みる' : 'つぎの カードへ';
-      next.onclick = () => { this.idx++; this.refreshHud(); this.cardBack(); };
+      this.idx++;
+      this.refreshHud();
+      this.cardBack();
     }
-    body.appendChild(next);
   },
 
   /* 特別カード（宝くじ・資格）：選んだら確定（選び直し不可） */
