@@ -24,11 +24,15 @@ const GAME = {
   turn: 0,            // いま入力している人（0始まり）
   setupIdx: 0,        // 準備中：いま設定している人
   showAllBalance: true,  // 設定：プレイ中に全員の残高を見せるか（初期値=見せる）
+  bgmOn: true,        // 設定：BGMを鳴らすか（初期値=あり）
 
   show(id){
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
     document.getElementById('s-'+id).classList.add('active');
     window.scrollTo(0,0);
+    // ゲーム中の画面だけ BGMを鳴らす
+    if(id==='game' || id==='mgame'){ this.playBgm(); }
+    else { this.stopBgm(); }
   },
 
   start(where){
@@ -44,16 +48,45 @@ const GAME = {
 
   goPlan(){ this.buildPlan(); this.show('plan'); },
 
+  /* BGM（ゲーム中だけ流す。設定でオン・オフ） */
+  _bgm: null,
+  playBgm(){
+    if(!this.bgmOn) return;
+    if(!this._bgm){
+      this._bgm = new Audio('bgm.mp3');
+      this._bgm.loop = true;
+      this._bgm.volume = 0.4;
+    }
+    // すでに再生中なら何もしない
+    this._bgm.play().catch(()=>{});  // 自動再生がブロックされても静かに無視
+  },
+  stopBgm(){
+    if(this._bgm){ this._bgm.pause(); this._bgm.currentTime = 0; }
+  },
+
   /* 設定画面 */
   openSettings(){
     const t = document.getElementById('setBalToggle');
     if(t) t.classList.toggle('on', this.showAllBalance);
+    const t2 = document.getElementById('setBgmToggle');
+    if(t2) t2.classList.toggle('on', this.bgmOn);
     this.show('settings');
   },
   toggleShowBalance(){
     this.showAllBalance = !this.showAllBalance;
     const t = document.getElementById('setBalToggle');
     if(t) t.classList.toggle('on', this.showAllBalance);
+  },
+  toggleBgm(){
+    this.bgmOn = !this.bgmOn;
+    const t = document.getElementById('setBgmToggle');
+    if(t) t.classList.toggle('on', this.bgmOn);
+    // オフにしたら今すぐ止める。オンにしてゲーム画面ならすぐ鳴らす
+    if(!this.bgmOn){ this.stopBgm(); }
+    else {
+      const active = document.querySelector('.screen.active');
+      if(active && (active.id==='s-game' || active.id==='s-mgame')){ this.playBgm(); }
+    }
   },
 
   /* =================================================================
