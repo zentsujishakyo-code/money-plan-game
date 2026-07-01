@@ -726,6 +726,12 @@ const GAME = {
       buttons.push({ btn:b, opt:o });
       body.appendChild(b);
     });
+    // 注意書き（ローンなど）の置き場所。選んだときだけ表示
+    const note = document.createElement('div');
+    note.id = 'greenNote';
+    note.className = 'green-note';
+    note.style.display = 'none';
+    body.appendChild(note);
     // 「つぎへ（決定）」ボタン。最初は隠す（何か選んでから出す）
     const next = document.createElement('button');
     next.className = 'btn btn-primary';
@@ -754,6 +760,12 @@ const GAME = {
       // 見た目：選んだものを強調、他は通常（薄くはしない＝選び直せるので）
       buttons.forEach(x=>{ x.btn.classList.remove('picked'); });
       b.classList.add('picked');
+      // 注意書き（ローンなど）を、選んでいる間だけ表示する
+      const noteBox = document.getElementById('greenNote');
+      if(noteBox){
+        if(o.note){ noteBox.textContent = o.note; noteBox.style.display = 'block'; }
+        else { noteBox.textContent = ''; noteBox.style.display = 'none'; }
+      }
       // 確定ボタンを出す
       const cf = document.getElementById('greenConfirm');
       if(cf) cf.style.display = 'block';
