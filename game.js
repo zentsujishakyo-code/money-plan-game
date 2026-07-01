@@ -23,6 +23,7 @@ const GAME = {
   players: [],        // [{name, selections, savingCourse, balance, flags, paidFixed, log:[]}]
   turn: 0,            // いま入力している人（0始まり）
   setupIdx: 0,        // 準備中：いま設定している人
+  showAllBalance: true,  // 設定：プレイ中に全員の残高を見せるか（初期値=見せる）
 
   show(id){
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -43,18 +44,30 @@ const GAME = {
 
   goPlan(){ this.buildPlan(); this.show('plan'); },
 
+  /* 設定画面 */
+  openSettings(){
+    const t = document.getElementById('setBalToggle');
+    if(t) t.classList.toggle('on', this.showAllBalance);
+    this.show('settings');
+  },
+  toggleShowBalance(){
+    this.showAllBalance = !this.showAllBalance;
+    const t = document.getElementById('setBalToggle');
+    if(t) t.classList.toggle('on', this.showAllBalance);
+  },
+
   /* =================================================================
      みんなで遊ぶモード（複数人・パスアンドプレイ）
      ================================================================= */
 
-  /* 「みんなで遊ぶ」を選んだ：人数を決める画面へ（難易度はタイトルで選択済み） */
+  /* 「みんなで遊ぶ」を選んだ：まず遊び方の注意を見せる（難易度はタイトルで選択済み） */
   startMulti(){
     this.multi = true;
     this.players = [];
     this.salary = CONFIG.SALARY;
     this.diff = CONFIG.DIFFICULTY_SETS[CONFIG.DIFFICULTY] || CONFIG.DIFFICULTY_SETS.easy;
     document.getElementById('sumSalary').textContent = yen(this.salary);
-    this.show('mcount');
+    this.show('mnotice');
   },
 
   /* （未使用）難易度画面：タイトルの難易度を使うため不要だが互換のため残す */
@@ -318,7 +331,8 @@ const GAME = {
     }
   },
 
-  /* 今の手番の人の 残高と のこりカードを 上部HUDに表示（一人用と同じ位置） */
+  /* 今の手番の人の 残高と のこりカードを 上部HUDに表示。
+     設定で「みんなの残高を見せる」がONなら、下に全員の一覧も出す。 */
   mRefreshBoard(){
     this.mRenderFixedBar();
     const balEl = document.getElementById('mBal');
@@ -326,13 +340,33 @@ const GAME = {
     const pl = this.players[this.turn];
     if(!pl) return;
     // 操作中の人は、書き戻し前でも最新の残高(this.balance)を見せる
-    const bal = (this._cur === pl) ? this.balance : pl.balance;
-    balEl.textContent = yen(bal);
-    balEl.classList.toggle('neg', bal<0);
+    const curBal = (this._cur === pl) ? this.balance : pl.balance;
+    balEl.textContent = yen(curBal);
+    balEl.classList.toggle('neg', curBal<0);
     const label = document.getElementById('mBalLabel');
     if(label) label.textContent = this.escapeHtml(pl.name)+' さんの ざんだか';
     const rem = document.getElementById('mRem');
     if(rem) rem.textContent = (this.deck.length - this.idx)+'まい';
+
+    // みんなの残高一覧（設定ON時のみ）
+    const board = document.getElementById('mBoard');
+    if(board){
+      if(this.showAllBalance){
+        board.innerHTML = '<div class="board-title">みんなの ざんだか</div>'
+          + '<div class="board-rows">'
+          + this.players.map((p,i)=>{
+              const isTurn = (i===this.turn);
+              const bal = (this._cur===p) ? this.balance : p.balance;
+              const neg = bal<0 ? ' neg' : '';
+              return '<div class="board-row'+(isTurn?' now':'')+'">'
+                + '<span class="br-name">'+(isTurn?'▶ ':'')+this.escapeHtml(p.name)+'</span>'
+                + '<span class="br-bal'+neg+'">'+yen(bal)+'</span></div>';
+            }).join('')
+          + '</div>';
+      } else {
+        board.innerHTML = '';
+      }
+    }
   },
 
   /* ---- 複数人 結果画面（全員ならべて見せる） ---- */
@@ -667,8 +701,108 @@ const GAME = {
   },
 
   renderGreen(card, body){
+    // この緑カードが「特別カード」か判定（宝くじ・資格などフラグやイベントが絡む）
+    const isSpecial = card.options.some(o => o.lottery || o.setsFlag);
+    if(isSpecial){
+      this.renderGreenSpecial(card, body);
+    } else {
+      this.renderGreenReselectable(card, body);
+    }
+  },
+
+  /* 普通の買い物カード：A→B→A と何度でも選び直せる。残高も自動で増減する */
+  renderGreenReselectable(card, body){
+    this._greenPicked = null;   // いま選んでいる選択肢
+    this._greenPaid = 0;        // いま反映している支払い額
+    const buttons = [];
     card.options.forEach(o => {
-      // onlyIfFlag：条件を満たさない人にはこの選択肢を出さない
+      if(o.onlyIfFlag && !this.flags[o.onlyIfFlag]) return;
+      const b = document.createElement('button');
+      b.className = 'choice '+o.label;
+      b.innerHTML = '<span class="ci"><span class="badge">'+o.label+'</span>'
+        + '<span>'+o.text+'</span></span>'
+        + '<span class="amt">'+o.cost.toLocaleString('ja-JP')+'えん</span>';
+      b.onclick = () => this.pickReselectable(card, o, b, body, buttons);
+      buttons.push({ btn:b, opt:o });
+      body.appendChild(b);
+    });
+    // 「つぎへ（決定）」ボタン。最初は隠す（何か選んでから出す）
+    const next = document.createElement('button');
+    next.className = 'btn btn-primary';
+    next.style.marginTop = '12px';
+    next.style.display = 'none';
+    next.id = 'greenConfirm';
+    next.textContent = (this.multi
+        ? ((this.idx+1>=this.deck.length && this.turn+1>=this.playerCount) ? 'けっかを みる' : 'つぎへ')
+        : ((this.idx+1>=this.deck.length) ? 'けっかを みる' : 'つぎの カードへ'));
+    next.onclick = () => this.confirmReselectable(card, body);
+    body.appendChild(next);
+  },
+
+  /* 選び直し：押すたびに 前の支払いを戻して 新しい支払いを反映 */
+  pickReselectable(card, o, b, body, buttons){
+    // マイナスになる場合は警告（ただし戻せるので、確認のみ）
+    const prevPaid = this._greenPaid;
+    const wouldBe = this.balance + prevPaid - o.cost; // 一度戻してから引いた結果
+    const apply = () => {
+      // 前の支払いを戻す
+      if(this._greenPaid){ this.gain(this._greenPaid); }
+      // 新しい支払いを反映
+      this.pay(o.cost);
+      this._greenPaid = o.cost;
+      this._greenPicked = o;
+      // 見た目：選んだものを強調、他は通常（薄くはしない＝選び直せるので）
+      buttons.forEach(x=>{ x.btn.classList.remove('picked'); });
+      b.classList.add('picked');
+      // 確定ボタンを出す
+      const cf = document.getElementById('greenConfirm');
+      if(cf) cf.style.display = 'block';
+    };
+    if(o.cost>0 && wouldBe<0){
+      this.confirmMinus(o.cost, apply, prevPaid);
+    } else {
+      apply();
+    }
+  },
+
+  /* 選び直しカードの確定：メッセージを出して次へ */
+  confirmReselectable(card, body){
+    const o = this._greenPicked;
+    if(!o) return;
+    // 選択肢を確定（押せなくする）
+    body.querySelectorAll('.choice').forEach(x=>{ x.disabled=true; if(!x.classList.contains('picked')) x.classList.add('faded'); });
+    const cf = document.getElementById('greenConfirm');
+    if(cf) cf.remove();
+    if(o.note){
+      const m = document.createElement('div');
+      m.className='resultmsg'; m.style.color='var(--muted)';
+      m.textContent = o.note;
+      body.appendChild(m);
+    }
+    // 次へ進む（afterActionの「つぎへ」を出す。支払いは既に反映済みなのでfxなし）
+    this.afterActionAfterReselect(body);
+  },
+
+  /* 選び直しカード用：支払いは反映済みなので、次へボタンだけ出す */
+  afterActionAfterReselect(body){
+    const next = document.createElement('button');
+    next.className='btn btn-primary'; next.style.marginTop='12px';
+    if(this.multi && this._afterHook){
+      const lastCard = (this.idx+1 >= this.deck.length);
+      const lastPlayer = (this.turn+1 >= this.playerCount);
+      next.textContent = (lastCard && lastPlayer) ? 'けっかを みる' : 'つぎへ';
+      const hook = this._afterHook;
+      next.onclick = () => { this._afterHook = null; hook(); };
+    } else {
+      next.textContent = (this.idx+1 >= this.deck.length) ? 'けっかを みる' : 'つぎの カードへ';
+      next.onclick = () => { this.idx++; this.refreshHud(); this.cardBack(); };
+    }
+    body.appendChild(next);
+  },
+
+  /* 特別カード（宝くじ・資格）：選んだら確定（選び直し不可） */
+  renderGreenSpecial(card, body){
+    card.options.forEach(o => {
       if(o.onlyIfFlag && !this.flags[o.onlyIfFlag]) return;
       const b = document.createElement('button');
       b.className = 'choice '+o.label;
@@ -676,7 +810,6 @@ const GAME = {
         + '<span>'+o.text+'</span></span>'
         + '<span class="amt">'+o.cost.toLocaleString('ja-JP')+'えん</span>';
       b.onclick = () => {
-        // お金を払うと残高がマイナスになる場合は、緑カードだけ警告を出す
         const willGoNegative = (o.cost > 0) && ((this.balance - o.cost) < 0);
         if(willGoNegative){
           this.confirmMinus(o.cost, () => this.applyGreenChoice(card, o, b, body));
@@ -767,9 +900,9 @@ const GAME = {
     this.afterAction(body, '', fx);
   },
 
-  /* マイナスになる買い物の確認ダイアログ */
-  confirmMinus(cost, onOk){
-    const after = this.balance - cost;
+  /* マイナスになる買い物の確認ダイアログ。refund=選び直しで戻せる額（あれば） */
+  confirmMinus(cost, onOk, refund){
+    const after = this.balance + (refund||0) - cost;
     const mask = document.createElement('div');
     mask.className = 'warnmask';
     mask.innerHTML =
