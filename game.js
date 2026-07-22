@@ -357,7 +357,8 @@ const GAME = {
       '<div class="turn-label">'+this.escapeHtml(pl.name)+' さんの ばん</div>'
       + '<div class="cardback" id="mBack"><span class="qm">？</span></div>'
       + '<div class="progress">タップして めくろう</div>';
-    document.getElementById('mBack').onclick = () => this.mReveal();
+    const back = document.getElementById('mBack');
+    back.onclick = () => this.flipReveal(stage, back, () => this.mReveal());
     this.mRefreshBoard();
   },
 
@@ -433,7 +434,7 @@ const GAME = {
 
   /* 今の手番の人の 残高と のこりカードを 上部HUDに表示。
      設定で「みんなの残高を見せる」がONなら、下に全員の一覧も出す。 */
-  mRefreshBoard(){
+  mRefreshBoard(delta){
     this.mRenderFixedBar();
     const balEl = document.getElementById('mBal');
     if(!balEl) return;
@@ -441,12 +442,18 @@ const GAME = {
     if(!pl) return;
     // 操作中の人は、書き戻し前でも最新の残高(this.balance)を見せる
     const curBal = (this._cur === pl) ? this.balance : pl.balance;
-    balEl.textContent = yenSign(curBal);
+    // アニメーションの起点は「この人が最後に表示された時の値」。手番が変わっただけなら瞬時に表示する
+    const from = (pl._disp !== undefined) ? pl._disp : curBal;
+    this.tweenNumber(balEl, from, curBal, (v)=>yenSign(Math.round(v)));
+    pl._disp = curBal;
     balEl.classList.toggle('neg', curBal<0);
     const label = document.getElementById('mBalLabel');
     if(label) label.textContent = this.escapeHtml(pl.name)+' さんの ざんだか';
     const rem = document.getElementById('mRem');
     if(rem) rem.textContent = (this.deck.length - this.idx)+'まい';
+    this.renderDotGauge('mDots');
+    this.updateHudWarn(document.querySelector('#s-mgame .hud'), curBal);
+    if(delta) this.showDelta('mDelta', delta);
 
     // みんなの残高一覧（設定ON時のみ）
     const board = document.getElementById('mBoard');
@@ -475,7 +482,9 @@ const GAME = {
     if(leftover) leftover.remove();
     const host = document.getElementById('mResultList');
     host.innerHTML = '';
-    this.players.forEach(pl => {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const rows = this.players.map(pl => {
       const plus = pl.balance >= 0;
       const course = pl.savingCourse;
       const goal = course ? course.goal : 0;
@@ -489,17 +498,31 @@ const GAME = {
       const reflHtml = '<div class="rc-reflect">'
         + refl.map(t=>'<div class="rc-rline">・'+t+'</div>').join('')
         + '</div>';
+      return { pl, plus, course, starHtml, reflHtml };
+    });
+
+    // のこりが少ない人から順に発表し、いちばん多かった人を最後に強調する
+    const maxBal = Math.max(...rows.map(r=>r.pl.balance));
+    const ordered = rows.slice().sort((a,b)=>a.pl.balance - b.pl.balance);
+    ordered.forEach((r, i) => {
+      const isTop = (r.pl.balance === maxBal) && (rows.length > 1);
       const card = document.createElement('div');
-      card.className = 'result-card';
+      card.className = 'result-card' + (isTop?' crown':'') + (reduced ? '' : ' rank-hide');
       card.innerHTML =
         '<div class="rc-top">'
-        + '<div class="rc-name">'+this.escapeHtml(pl.name)+'</div>'
-        + '<div class="rc-bal'+(plus?'':' neg')+'">'+yenSign(pl.balance)+'</div>'
-        + '<div class="rc-goal">目標：'+(course?course.label:'—')+'</div>'
-        + '<div class="rc-stars">'+starHtml+'</div>'
+        + '<div class="rc-name">'+this.escapeHtml(r.pl.name)+'</div>'
+        + '<div class="rc-bal'+(r.plus?'':' neg')+'">'+yenSign(r.pl.balance)+'</div>'
+        + '<div class="rc-goal">目標：'+(r.course?r.course.label:'—')+'</div>'
+        + '<div class="rc-stars">'+r.starHtml+'</div>'
         + '</div>'
-        + reflHtml;
+        + r.reflHtml;
       host.appendChild(card);
+      if(!reduced){
+        setTimeout(()=>{
+          card.classList.remove('rank-hide');
+          card.classList.add('rank-show');
+        }, i*260 + 120);
+      }
     });
     // 話し合いのきっかけ（毎回ランダムで いくつか）
     const talk = document.getElementById('mTalk');
@@ -531,7 +554,7 @@ const GAME = {
           const cost = (exp && idx!==undefined) ? exp.options[idx].cost : 0;
           const name = (exp&&exp.name)?exp.name:pc.title;
           const done = paid[pc.expenseKey] ? ' paid' : '';
-          return '<div class="fc'+done+'"><span class="fcname">'+name+'</span>'
+          return '<div class="fc'+done+'" data-k="'+pc.expenseKey+'"><span class="fcname">'+name+'</span>'
             + '<span class="fcyen">'+cost.toLocaleString('ja-JP')+'</span></div>';
         }).join('')
       + '</div>';
@@ -631,6 +654,7 @@ const GAME = {
   /* ---- ゲーム開始 ---- */
   startGame(){
     this.balance = this.salary - this.planTotal();
+    this._displayedBalance = undefined;   // 前回のゲームの残高からアニメしないようにリセット
     this.flags = {};
     this.paidFixed = {};            // 支払い済みの固定費
     this.deck = this.buildDeck();
@@ -750,12 +774,19 @@ const GAME = {
   },
 
   refreshHud(){
-    if(this.multi){ this.mRefreshBoard(); return; }
+    const delta = this._pendingDelta;
+    this._pendingDelta = null;
+    if(this.multi){ this.mRefreshBoard(delta); return; }
     const bal = document.getElementById('gBal');
     if(!bal) return;
-    bal.textContent = yenSign(this.balance);
+    const from = (this._displayedBalance!==undefined) ? this._displayedBalance : this.balance;
+    this.tweenNumber(bal, from, this.balance, (v)=>yenSign(Math.round(v)));
+    this._displayedBalance = this.balance;
     bal.classList.toggle('neg', this.balance<0);
     document.getElementById('gRem').textContent = (this.deck.length - this.idx)+'まい';
+    this.renderDotGauge('gDots');
+    this.updateHudWarn(document.querySelector('#s-game .hud'), this.balance);
+    if(delta) this.showDelta('gDelta', delta);
   },
 
   cardBack(){
@@ -765,12 +796,47 @@ const GAME = {
     const back = document.createElement('div');
     back.className = 'cardback';
     back.innerHTML = '<span class="qm">？</span>';
-    back.onclick = () => this.reveal();
+    back.onclick = () => this.flipReveal(stage, back, () => this.reveal());
     stage.appendChild(back);
     const p = document.createElement('div');
     p.className = 'progress';
     p.textContent = 'カードを タップして めくろう（'+(this.idx+1)+' / '+this.deck.length+'）';
     stage.appendChild(p);
+  },
+
+  /* カードめくりの演出：ふるえ→フリップアウト→中身表示→フリップイン＋種類色のグロー */
+  flipReveal(stage, back, doReveal){
+    if(back.dataset.flipping) return;
+    back.dataset.flipping = '1';
+    back.style.pointerEvents = 'none';
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(reduced){ doReveal(); this.playFlipInGlow(stage); return; }
+    back.classList.add('gc-tremble');
+    setTimeout(()=>{
+      back.classList.remove('gc-tremble');
+      back.classList.add('gc-flip-out');
+      setTimeout(()=>{
+        doReveal();
+        this.playFlipInGlow(stage);
+      }, 170);
+    }, 160);
+  },
+
+  /* めくった直後のカードに、種類色のグローをつけながら反転で出現させる */
+  playFlipInGlow(stage){
+    const card = stage.querySelector('.gamecard');
+    if(!card) return;
+    const head = card.querySelector('.gc-head');
+    let cls = 'gc-glow-green';
+    if(head && head.classList.contains('gc-yellow')) cls = 'gc-glow-yellow';
+    else if(head && head.classList.contains('gc-red')) cls = 'gc-glow-red';
+    card.classList.add('gc-flip-in', cls);
+    // rAFに頼らず 強制リフローで即座に反映させる（rAFが遅れる/来ない環境でも
+    // カードの中身（ボタン含む）が透明・回転したまま隠れっぱなしにならないようにする）
+    void card.offsetWidth;
+    card.classList.add('gc-flip-in-play');
+    // 万一トランジションが発火しない環境向けの保険：一定時間後に必ず通常表示へ戻す
+    setTimeout(()=>{ card.classList.remove('gc-flip-in','gc-flip-in-play'); }, 500);
   },
 
   reveal(){
@@ -970,34 +1036,45 @@ const GAME = {
     const multi = this.multi;
     const bought = multi ? !!(this._cur && this._cur.boughtLottery) : true;
     const win = multi ? !!(this._cur && this._cur.lotteryWin) : !!card._win;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    const box = document.createElement('div');
-    if(multi && !bought){
-      // 買っていない人：抽選なし
-      box.className = 'bigbox';
-      box.style.marginBottom = '12px';
-      box.innerHTML = '<div class="k">抽選日</div><div class="v" style="font-size:16px;">あなたは 宝くじを 買わなかったので、抽選は ありません</div>';
-    } else {
-      box.className = 'bigbox '+(win?'box-ok':'box-warn');
-      box.style.marginBottom = '12px';
-      box.innerHTML = win
-        ? '<div class="k">大当たり！</div><div class="v">'+L.prize.toLocaleString('ja-JP')+'えん 当たった！</div>'
-        : '<div class="k">はずれ…</div><div class="v">買った '+L.cost.toLocaleString('ja-JP')+'えんは もどってきません</div>';
-    }
-    body.appendChild(box);
+    // 抽選中… の一瞬の間を置いてから結果を出す（当落はすでに決まっている＝表示を遅らせるだけ）
+    const spin = document.createElement('div');
+    spin.className = 'bigbox';
+    spin.style.marginBottom = '12px';
+    spin.innerHTML = '<div class="k">抽選中…</div><div class="v"><span class="spin-ic spinning">🎟️</span></div>';
+    body.appendChild(spin);
 
-    // 確率の説明（全員に見せる）
-    const note = document.createElement('div');
-    note.className = 'lottery-note';
-    note.innerHTML = '<p>'+L.inGameText+'</p>' + '<p>'+L.realText+'</p>';
-    body.appendChild(note);
+    setTimeout(()=>{
+      spin.remove();
+      const box = document.createElement('div');
+      if(multi && !bought){
+        // 買っていない人：抽選なし
+        box.className = 'bigbox';
+        box.style.marginBottom = '12px';
+        box.innerHTML = '<div class="k">抽選日</div><div class="v" style="font-size:16px;">あなたは 宝くじを 買わなかったので、抽選は ありません</div>';
+      } else {
+        box.className = 'bigbox '+(win?'box-ok':'box-warn');
+        box.style.marginBottom = '12px';
+        box.innerHTML = win
+          ? '<div class="k">大当たり！</div><div class="v">'+L.prize.toLocaleString('ja-JP')+'えん 当たった！</div>'
+          : '<div class="k">はずれ…</div><div class="v">買った '+L.cost.toLocaleString('ja-JP')+'えんは もどってきません</div>';
+      }
+      body.appendChild(box);
 
-    let fx = null;
-    if(bought){
-      if(win){ this.gain(L.prize); fx='excited'; }
-      else { fx='minus'; }
-    }
-    this.afterAction(body, '', fx);
+      // 確率の説明（全員に見せる）
+      const note = document.createElement('div');
+      note.className = 'lottery-note';
+      note.innerHTML = '<p>'+L.inGameText+'</p>' + '<p>'+L.realText+'</p>';
+      body.appendChild(note);
+
+      let fx = null;
+      if(bought){
+        if(win){ this.gain(L.prize); fx='excited'; }
+        else { fx='minus'; }
+      }
+      this.afterAction(body, '', fx);
+    }, reduced ? 0 : 700);
   },
 
   /* マイナスになる買い物の確認ダイアログ。refund=選び直しで戻せる額（あれば） */
@@ -1048,29 +1125,41 @@ const GAME = {
       // 手番の人のデータに記録し、バーを描き直す
       if(this._cur){ this._cur.paidFixed = this.paidFixed; }
       this.mRenderFixedBar();
+      const cell = document.querySelector('#mFixedBar .fc[data-k="'+key+'"]');
+      if(cell){ cell.classList.add('pop'); setTimeout(()=>cell.classList.remove('pop'), 400); }
       return;
     }
     const cell = document.getElementById('fc-'+key);
-    if(cell) cell.classList.add('paid');
+    if(cell){ cell.classList.add('paid','pop'); setTimeout(()=>cell.classList.remove('pop'), 400); }
   },
 
   renderFukubiki(card, body){
     const rate = (this.diff.fukubikiWin!==undefined) ? this.diff.fukubikiWin : CONFIG.FUKUBIKI_WIN_RATE;
     const b = document.createElement('button');
     b.className='btn btn-primary';
-    b.textContent='🎁 くじを 引く';
+    b.innerHTML = '<span class="spin-ic">🎁</span> くじを 引く';
     b.onclick = () => {
-      b.remove();
-      const win = Math.random() < rate;
-      const amt = win ? card.win : card.lose;
-      if(win && amt) this.gain(amt);
-      const box = document.createElement('div');
-      box.className = 'bigbox '+(win?'box-ok':'box-warn'); box.style.marginTop='12px';
-      box.innerHTML = win
-        ? '<div class="k">あたり！</div><div class="v">'+amt.toLocaleString('ja-JP')+'えん もらえたよ</div>'
-        : '<div class="k">はずれ…</div><div class="v">0えん</div>';
-      body.appendChild(box);
-      this.afterAction(body, '', win?'excited':null);
+      b.disabled = true;
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const spinEl = b.querySelector('.spin-ic');
+      const faces = ['🎁','⭐','💰','🎉'];
+      let i = 0;
+      spinEl.classList.add('spinning');
+      const spin = reduced ? null : setInterval(()=>{ i++; spinEl.textContent = faces[i % faces.length]; }, 90);
+      setTimeout(()=>{
+        if(spin) clearInterval(spin);
+        b.remove();
+        const win = Math.random() < rate;
+        const amt = win ? card.win : card.lose;
+        if(win && amt) this.gain(amt);
+        const box = document.createElement('div');
+        box.className = 'bigbox '+(win?'box-ok':'box-warn'); box.style.marginTop='12px';
+        box.innerHTML = win
+          ? '<div class="k">あたり！</div><div class="v">'+amt.toLocaleString('ja-JP')+'えん もらえたよ</div>'
+          : '<div class="k">はずれ…</div><div class="v">0えん</div>';
+        body.appendChild(box);
+        this.afterAction(body, '', win?'excited':null);
+      }, reduced ? 0 : 650);
     };
     body.appendChild(b);
   },
@@ -1210,8 +1299,58 @@ const GAME = {
     return life;
   },
 
-  pay(n){ this.balance -= n; this.refreshHud(); },
-  gain(n){ this.balance += n; this.refreshHud(); },
+  pay(n){ this.balance -= n; this._pendingDelta = -(n||0); this.refreshHud(); },
+  gain(n){ this.balance += n; this._pendingDelta = (n||0); this.refreshHud(); },
+
+  /* 数値を前の表示値からアニメーションさせながら書き換える（reduced-motion時は瞬時） */
+  tweenNumber(el, from, to, fmt){
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(reduced || from===to){ el.textContent = fmt(to); return; }
+    const dur = 450;
+    const t0 = performance.now();
+    const step = (t)=>{
+      const p = Math.min(1, (t - t0) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmt(from + (to - from) * eased);
+      if(p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  },
+
+  /* 増減を残高の横に一瞬 浮かせて見せる */
+  showDelta(elId, amount){
+    const el = document.getElementById(elId);
+    if(!el || !amount) return;
+    el.textContent = (amount>0?'▲':'▼') + Math.abs(amount).toLocaleString('ja-JP');
+    el.className = 'delta-float ' + (amount>0?'plus':'minus');
+    void el.offsetWidth;
+    el.classList.add('show');
+  },
+
+  /* のこりカードを ドット列で見せる（消化した分だけ埋まる） */
+  renderDotGauge(hostId){
+    const host = document.getElementById(hostId);
+    if(!host) return;
+    const total = this.deck.length;
+    const used = this.idx;
+    this._dotsUsed = this._dotsUsed || {};
+    const prevUsed = this._dotsUsed[hostId];
+    let html = '';
+    for(let i=0;i<total;i++){ html += '<span class="dot'+(i<used?' used':'')+'"></span>'; }
+    host.innerHTML = html;
+    if(prevUsed!==undefined && used>prevUsed){
+      const dots = host.querySelectorAll('.dot');
+      const last = dots[used-1];
+      if(last) last.classList.add('pop');
+    }
+    this._dotsUsed[hostId] = used;
+  },
+
+  /* 赤字のときに HUDの縁を脈打たせる */
+  updateHudWarn(hudEl, bal){
+    if(!hudEl) return;
+    hudEl.classList.toggle('warn-neg', bal<0);
+  },
 
   finish(){ this.endScreen(); },
 
@@ -1225,7 +1364,6 @@ const GAME = {
     const bigMinus = (this.balance < 0) && (Math.abs(this.balance) > threshold);
     const m = plus ? e.plus : (bigMinus && e.bigminus ? e.bigminus : e.minus);
     const balEl = document.getElementById('endBal');
-    balEl.textContent = yenSign(this.balance);
     balEl.classList.toggle('neg', this.balance<0);
     const big = document.getElementById('endBig');
     big.textContent = plus ? 'プラスで おわったね' : (bigMinus ? 'つかいすぎ かも…' : 'マイナスで おわったね');
@@ -1239,12 +1377,20 @@ const GAME = {
       endChar.src = plus ? 'char-clear.png' : (bigMinus ? 'char-sad.png' : 'char-encourage.png');
       endChar.alt = '';
     }
-    this.renderStars();
     this.renderReflection();
+
+    // 見出し・本文などは いったん隠しておき、星が出そろってから ふわっと見せる
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.querySelectorAll('#s-end .end-fade').forEach(el=>el.classList.remove('show'));
+    if(reduced) document.querySelectorAll('#s-end .end-fade').forEach(el=>el.classList.add('show'));
+
+    // 残高は 0からカウントアップして見せる
+    this.tweenNumber(balEl, 0, this.balance, (v)=>yenSign(Math.round(v)));
+    this.renderStars();
     this.show('end');
   },
 
-  /* 貯金チャレンジの達成を 星で表す */
+  /* 貯金チャレンジの達成を 星で表す（1つずつポップ→3つ星なら紙吹雪→本文をふわっと見せる） */
   renderStars(){
     const host = document.getElementById('endStars');
     if(!host) return;
@@ -1259,12 +1405,72 @@ const GAME = {
       stars = 1; label = 'つぎは 赤字に ならないように チャレンジ！';
     }
     let s = '';
-    for(let i=0;i<3;i++){ s += '<span class="star '+(i<stars?'on':'')+'">★</span>'; }
+    for(let i=0;i<3;i++){ s += '<span class="star" data-i="'+i+'">★</span>'; }
     let goalLine = '';
     if(course){
       goalLine = '<div class="goal-line">こんげつの 目標：'+course.label+'（'+course.sub+'）</div>';
     }
-    host.innerHTML = goalLine + '<div class="stars">'+s+'</div><div class="star-label">'+label+'</div>';
+    host.innerHTML = goalLine + '<div class="stars">'+s+'</div><div class="star-label" id="starLabel" style="opacity:0;">'+label+'</div>';
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const starEls = host.querySelectorAll('.star');
+    const labelEl = document.getElementById('starLabel');
+    if(reduced){
+      starEls.forEach((el,i)=>{ if(i<stars) el.classList.add('on'); });
+      if(labelEl) labelEl.style.opacity = '1';
+      return;
+    }
+    starEls.forEach((el,i)=>{
+      setTimeout(()=>{
+        if(i<stars){
+          el.classList.add('on','pop');
+          setTimeout(()=>el.classList.remove('pop'), 450);
+        }
+        if(i===2){
+          if(stars===3) this.burstConfetti();
+          if(labelEl){ labelEl.style.transition = 'opacity .4s ease'; labelEl.style.opacity = '1'; }
+          document.querySelectorAll('#s-end .end-fade').forEach(el2=>el2.classList.add('show'));
+        }
+      }, 450 + i*260);
+    });
+  },
+
+  /* 3つ星のときの お祝い紙吹雪（#endStars の上に一時的に重ねる） */
+  burstConfetti(){
+    const host = document.getElementById('endStars');
+    if(!host) return;
+    const canvas = document.createElement('canvas');
+    canvas.className = 'confetti-canvas';
+    host.appendChild(canvas);
+    const rect = host.getBoundingClientRect();
+    const w = Math.max(rect.width, 240), h = 220;
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const colors = ['#2e8b57','#f5b400','#3a6ea5','#d64545'];
+    const parts = Array.from({length:56}, ()=>({
+      x: w/2, y: h*0.15,
+      vx: (Math.random()-0.5)*6.5, vy: (Math.random()-1.3)*6,
+      g: 0.18, size: 3+Math.random()*3, color: colors[Math.floor(Math.random()*colors.length)],
+      life: 55+Math.random()*20
+    }));
+    let frame = 0;
+    const loop = ()=>{
+      frame++;
+      ctx.clearRect(0,0,w,h);
+      let alive = false;
+      parts.forEach(p=>{
+        if(p.life<=0) return;
+        alive = true;
+        p.x += p.vx; p.y += p.vy; p.vy += p.g; p.life--;
+        ctx.globalAlpha = Math.max(0, p.life/70);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+      });
+      ctx.globalAlpha = 1;
+      if(alive && frame < 90) requestAnimationFrame(loop);
+      else canvas.remove();
+    };
+    loop();
   },
 
   /* プレイ内容に応じた ふりかえりの一言 */
@@ -1311,7 +1517,7 @@ const GAME = {
       + pick.map(t=>'<div class="reflect-line">・'+t+'</div>').join('');
   },
 
-  restart(){ this.selections={}; this.flags={}; this.balance=0; this.idx=0; this.savingCourse=null; this.rankCard=null; this.multi=false; this.players=[]; this.turn=0; this.setupIdx=0; this._afterHook=null; this._cur=null; this.show('menu'); }
+  restart(){ this.selections={}; this.flags={}; this.balance=0; this.idx=0; this.savingCourse=null; this.rankCard=null; this.multi=false; this.players=[]; this.turn=0; this.setupIdx=0; this._afterHook=null; this._cur=null; this._displayedBalance=undefined; this._pendingDelta=null; this.show('menu'); }
 };
 
 function yen(n){ return n.toLocaleString('ja-JP') + 'えん'; }

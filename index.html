@@ -371,6 +371,66 @@
     background:var(--green); color:#fff; font-size:9px; font-weight:700;
     padding:1px 5px; border-radius:8px;
   }
+
+  /* ===== 演出強化：カードをめくる ===== */
+  #gStage, #mStage{ perspective:900px; }
+  .cardback.gc-tremble{ animation:cardTremble .22s ease; }
+  .cardback.gc-flip-out{ animation:cardFlipOut .18s ease forwards; }
+  @keyframes cardTremble{ 0%,100%{ transform:translateX(0) rotate(0);} 25%{ transform:translateX(-3px) rotate(-2deg);} 75%{ transform:translateX(3px) rotate(2deg);} }
+  @keyframes cardFlipOut{ from{ transform:rotateY(0); opacity:1;} to{ transform:rotateY(90deg); opacity:0;} }
+  .gamecard.gc-flip-in{ transform:rotateY(-90deg); opacity:0; }
+  .gamecard.gc-flip-in.gc-flip-in-play{
+    transition:transform .3s cubic-bezier(.3,.9,.4,1), opacity .22s ease;
+    transform:rotateY(0deg); opacity:1;
+  }
+  .gamecard.gc-glow-green{ animation:gcGlowGreen .6s ease; }
+  .gamecard.gc-glow-yellow{ animation:gcGlowYellow .6s ease; }
+  .gamecard.gc-glow-red{ animation:gcGlowRed .6s ease; }
+  @keyframes gcGlowGreen{ 0%{ box-shadow:0 0 0 0 rgba(46,139,87,0);} 35%{ box-shadow:0 0 22px 6px rgba(46,139,87,.5);} 100%{ box-shadow:0 0 0 0 rgba(46,139,87,0);} }
+  @keyframes gcGlowYellow{ 0%{ box-shadow:0 0 0 0 rgba(244,180,0,0);} 35%{ box-shadow:0 0 22px 6px rgba(244,180,0,.5);} 100%{ box-shadow:0 0 0 0 rgba(244,180,0,0);} }
+  @keyframes gcGlowRed{ 0%{ box-shadow:0 0 0 0 rgba(214,69,69,0);} 35%{ box-shadow:0 0 22px 6px rgba(214,69,69,.45);} 100%{ box-shadow:0 0 0 0 rgba(214,69,69,0);} }
+  .spin-ic{ display:inline-block; }
+  .spin-ic.spinning{ animation:spinTick .5s ease-in-out infinite; }
+  @keyframes spinTick{ 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.15);} }
+
+  /* ===== 演出強化：HUDの動き ===== */
+  .hud{ position:sticky; }
+  .hud.warn-neg{ animation:hudWarnPulse 1.1s ease infinite; }
+  @keyframes hudWarnPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(214,69,69,.35);} 50%{ box-shadow:0 0 0 6px rgba(214,69,69,0);} }
+  .delta-float{ position:absolute; right:16px; top:8px; font-size:13px; font-weight:700; opacity:0; pointer-events:none; }
+  .delta-float.plus{ color:var(--green-d); }
+  .delta-float.minus{ color:var(--red); }
+  .delta-float.show{ animation:deltaFloat .9s ease forwards; }
+  @keyframes deltaFloat{ 0%{ opacity:0; transform:translateY(4px);} 25%{ opacity:1; transform:translateY(0);} 80%{ opacity:1;} 100%{ opacity:0; transform:translateY(-16px);} }
+  .dotgauge{ display:flex; gap:4px; justify-content:center; flex-wrap:wrap; margin:2px 0 12px; }
+  .dotgauge .dot{ width:8px; height:8px; border-radius:50%; background:var(--line); transition:background .2s; }
+  .dotgauge .dot.used{ background:var(--green); }
+  .dotgauge .dot.pop{ animation:dotPop .35s ease; }
+  @keyframes dotPop{ 0%{ transform:scale(1.8);} 100%{ transform:scale(1);} }
+  .fc.pop, .fixedbar .fc.pop{ animation:fcPop .4s cubic-bezier(.3,1.6,.4,1); }
+  @keyframes fcPop{ 0%{ transform:scale(1);} 40%{ transform:scale(1.25);} 100%{ transform:scale(1);} }
+
+  /* ===== 演出強化：結果画面 ===== */
+  .stars .star.pop{ animation:starPop .45s cubic-bezier(.3,1.8,.4,1); }
+  @keyframes starPop{ 0%{ transform:scale(0) rotate(-40deg);} 60%{ transform:scale(1.3) rotate(8deg);} 100%{ transform:scale(1) rotate(0);} }
+  #endStars{ position:relative; }
+  .confetti-canvas{ position:absolute; top:0; left:-10%; width:120%; height:220px; pointer-events:none; }
+  .end-fade{ opacity:0; transition:opacity .4s ease; }
+  .end-fade.show{ opacity:1; }
+  .result-card.rank-hide{ opacity:0; transform:translateY(10px); }
+  .result-card.rank-show{ animation:rankIn .4s ease forwards; }
+  @keyframes rankIn{ to{ opacity:1; transform:translateY(0);} }
+  .result-card.crown{ border-color:var(--yellow); background:#fffaf0; }
+  .result-card.crown .rc-name::before{ content:"👑 "; }
+
+  @media (prefers-reduced-motion: reduce){
+    .cardback.gc-tremble, .cardback.gc-flip-out, .gamecard.gc-flip-in.gc-flip-in-play,
+    .gamecard.gc-glow-green, .gamecard.gc-glow-yellow, .gamecard.gc-glow-red,
+    .spin-ic.spinning, .hud.warn-neg, .delta-float.show, .dotgauge .dot.pop, .fc.pop,
+    .stars .star.pop, .result-card.rank-show{ animation:none !important; transition:none !important; }
+    .gamecard.gc-flip-in{ transform:none; opacity:1; }
+    .result-card.rank-hide{ opacity:1; transform:none; }
+  }
 </style>
 </head>
 <body>
@@ -467,10 +527,12 @@
   <!-- カードゲーム -->
   <section class="screen" id="s-game">
     <div class="hud">
+      <div class="delta-float" id="gDelta"></div>
       <div><div class="lbl">いまの ざんだか</div><div class="bal" id="gBal">0えん</div></div>
       <div><div class="lbl">のこりカード</div><div class="rem" id="gRem">0まい</div></div>
     </div>
     <div class="fixedbar" id="fixedBar"></div>
+    <div class="dotgauge" id="gDots"></div>
     <div id="gStage"></div>
   </section>
 
@@ -484,10 +546,10 @@
       <img id="endChar" class="endchar" src="" alt="">
       <div class="big" id="endBig">—</div>
       <div id="endStars"></div>
-      <div class="endhead" id="endHead"></div>
-      <div class="endbody" id="endBody"></div>
-      <div id="endReflect"></div>
-      <div class="endcommon" id="endCommon"></div>
+      <div class="endhead end-fade" id="endHead"></div>
+      <div class="endbody end-fade" id="endBody"></div>
+      <div class="end-fade" id="endReflect"></div>
+      <div class="endcommon end-fade" id="endCommon"></div>
       <div class="learn-box">
         <p class="learn-p">このゲームは、くらしの ほんの <ruby>一部<rt>いちぶ</rt></ruby>を <ruby>切<rt>き</rt></ruby>りとった ものです。ほんとうの <ruby>生活<rt>せいかつ</rt></ruby>には、もっと いろんなことが あります。</p>
         <p class="learn-p">お<ruby>金<rt>かね</rt></ruby>は「つかう」だけでなく、もしもの ときの ために そなえたり、<ruby>将来<rt>しょうらい</rt></ruby>の ために ためたり、ふやしたり することも できます。</p>
@@ -553,10 +615,12 @@
   <!-- M4: ゲーム本編 -->
   <section class="screen" id="s-mgame">
     <div class="hud">
+      <div class="delta-float" id="mDelta"></div>
       <div><div class="lbl" id="mBalLabel">いまの ざんだか</div><div class="bal" id="mBal">0えん</div></div>
       <div><div class="lbl">のこりカード</div><div class="rem" id="mRem">0まい</div></div>
     </div>
     <div class="mfixed" id="mFixedBar"></div>
+    <div class="dotgauge" id="mDots"></div>
     <div id="mStage"></div>
     <div class="board" id="mBoard"></div>
   </section>
